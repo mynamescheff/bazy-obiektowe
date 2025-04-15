@@ -22,9 +22,7 @@ import csv
 import openpyxl
 from openpyxl.cell.cell import MergedCell
 
-#asd
-
-SHARED_MAILBOX_EMAIL = ""
+SHARED_MAILBOX_EMAIL = "" #insert email here
 notes_window = None
 instructions_window = None
 notes_content = ""
@@ -234,17 +232,6 @@ class CaseList:
                     duplicate_count = parts[1].count("DUPLICATE")
                     duplicate_counts[value] = duplicate_count
         return existing_values, duplicate_counts
-
-def check_file_conditions(excel_file_name, cell_b20_value, cell_c20_value):
-    is_condition_1 = cell_b20_value == 18 and cell_c20_value == "GBP"
-    is_condition_2 = "name1" in excel_file_name.upper() and cell_b20_value == 15
-    is_condition_3 = "name2"  in excel_file_name.upper() and cell_b20_value == 15
-    is_condition_4 = "name3"  in excel_file_name.upper() and cell_b20_value == 15
-    if is_condition_1 or is_condition_2 or is_condition_3 or is_condition_4:
-        return True, None
-    else:
-        mismatched_values = {"cell_b20_value": cell_b20_value, "cell_c20_value": cell_c20_value}
-        return False, mismatched_values
 
 class OutlookProcessor:
     def __init__(self, category, target_senders, attachment_save_path, msg_save_path):
@@ -578,12 +565,6 @@ class KejsarProcessor:
                     shutil.move(str(excel_file), os.path.join(self.error_dir, excel_file.name))
                     self.excel_files.pop(i)
                     continue
-                ws = wb[sheet_name]
-                cell_b20_value = ws["B20"].value
-                cell_c20_value = ws["C20"].value
-                is_condition_met, mismatched_values = check_file_conditions(excel_file.name, cell_b20_value, cell_c20_value)
-                if not is_condition_met:
-                    self.mismatched_cases.append((excel_file.name, mismatched_values))
             except Exception as e:
                 print(f"An error occurred with file {excel_file}: {e}")
                 shutil.move(str(excel_file), os.path.join(self.error_dir, excel_file.name))
@@ -591,140 +572,8 @@ class KejsarProcessor:
                 continue
             i += 1
 
-    def print_mismatched_cases(self):
-        if self.mismatched_cases:
-            print("Cases with mismatched values in B20 and C20 cells:")
-            for case in self.mismatched_cases:
-                print(f"File: {case[0]}, Mismatched Values: {case[1]}")
-
     def collect_values(self):
-        values_excel_files = {}
-        for excel_file in self.excel_files:
-            wb = load_workbook(filename=excel_file)
-            extra_cell_1 = wb["Sheet1"]["B19"]
-            extra_cell_2 = wb["Sheet1"]["C19"]
-            #if AQA is only in the first 10 characters of the filename
-            if "AQA" in excel_file.name[:10] or "Harrow School" in excel_file.name or "Assessment Qualification Alliance" in excel_file.name:
-                extra_cell_3 = wb["Sheet1"]["C24"]
-                extra_cell_4 = wb["Sheet1"]["C25"]
-                extra_cell_5 = wb["Sheet1"]["C26"]
-            else:
-                extra_cell_3 = wb["Sheet1"]["C33"]
-                extra_cell_4 = wb["Sheet1"]["C34"]
-                extra_cell_5 = wb["Sheet1"]["C35"]
-            rng_cell_1 = wb["Sheet1"]["B16"]
-            rng_cell_2 = wb["Sheet1"]["B17"]
-            #vendor name
-            rng_cell_3 = wb["Sheet1"]["B8"]
-        # Clean up the cells, but only modify if they are not MergedCells
-            if not isinstance(rng_cell_1, MergedCell):
-                rng_cell_1.value = str(rng_cell_1.value).replace("  ", " ").replace("\xa0", "").replace(" ", "").replace(".", " ").replace("–", "-").lstrip().replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028", " ").replace("\u2029", " ").replace(";", " ")
-            
-            if not isinstance(rng_cell_2, MergedCell):
-                rng_cell_2.value = str(rng_cell_2.value).replace(" ", "").replace("\xa0", "").replace(" ", "").lstrip().replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028", " ").replace("\u2029", " ")
-            
-            if not isinstance(rng_cell_3, MergedCell):
-                rng_cell_3.value = str(rng_cell_3.value).replace("\xa0", "").replace(" ", "").replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028", " ").replace("\u2029", " ")
-
-            rng_values = [rng_cell_1.value, rng_cell_2.value, rng_cell_3.value]      
-                    # Clean up the cells, but only if they are not MergedCells
-            
-            if not isinstance(extra_cell_3, MergedCell):
-                extra_cell_3.value = str(extra_cell_3.value).replace("/", "").lstrip().replace(" ", "").rstrip().replace("  ", "").replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028"," ").replace("\u2029"," ").replace(" ", "").replace("IBAN","").replace("IBAN:","").replace(":","")
-            if not isinstance(extra_cell_4, MergedCell):
-                extra_cell_4.value = str(extra_cell_4.value).replace("/", "").lstrip().replace(" ", "").rstrip().replace("  ", "").replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028"," ").replace("\u2029"," ").replace(" ", "")
-            #replace characters "USD" with "" in extra_cell_3 and extra_cell_4, but only if those are the first three characters
-            if extra_cell_3.value is not None:
-                extra_cell_3.value = extra_cell_3.value.replace("USD", "") if extra_cell_3.value[:3] == "USD" else extra_cell_3.value
-            if extra_cell_4.value is not None:
-                extra_cell_4.value = extra_cell_4.value.replace("USD", "") if extra_cell_4.value[:3] == "USD" else extra_cell_4.value
-            #replace characters "EUR" with "" in extra_cell_4 and extra_cell_3, but only if those are the last three characters
-            if extra_cell_4.value is not None:
-                extra_cell_4.value = extra_cell_4.value.replace("EUR", "") if extra_cell_4.value[-3:] == "EUR" else extra_cell_4.value
-            if extra_cell_3.value is not None:
-                extra_cell_3.value = extra_cell_3.value.replace("EUR", "") if extra_cell_3.value[-3:] == "EUR" else extra_cell_3.value
-
-
-            if extra_cell_4.value is not None:
-                extra_cell_4.value = extra_cell_4.value.replace("/", "").lstrip().replace(" ", "").rstrip().replace("  ", "").replace("\n", " ").replace("\t", " ").replace("\r", " ").replace("\x0b", " ").replace("\x0c", " ").replace("\t", " ").replace("\r", " ").replace("\x85", " ").replace("\r\n", " ").replace("\u2028"," ").replace("\u2029"," ").replace(" ", "")
-            if extra_cell_2.value is not None:
-                extra_cell_2.value = extra_cell_2.value.replace(" ", "").replace("\n", "").replace("\xa0", "").replace("\t", "").replace(',','.').replace('RS','PKR').replace('Rs','PKR').replace('rs','PKR').replace('EURO', 'EUR')
-
-            transformer = CharacterTransformer()
-            transformed_values = transformer.transform_to_swift_accepted_characters(rng_values)
-
-            extra_cell_1_value = extra_cell_1.value
-            extra_cell_2_value = extra_cell_2.value
-            extra_cell_2_value = str(extra_cell_2_value).lstrip()
-            extra_cell_3_value = self.clean_value(extra_cell_3.value)
-            extra_cell_4_value = self.clean_value(extra_cell_4.value)
-            extra_cell_5_value = self.clean_value(extra_cell_5.value)
-
-            transformed_rng_cell_1 = transformed_values[0]
-            transformed_rng_cell_2 = transformed_values[1]
-            transformed_rng_cell_3 = transformed_values[2]
-
-            # Use the updated match_bank_name logic with extra_cell_3_value and extra_cell_4_value
-            bank_name = self.match_bank_name(extra_cell_3_value, extra_cell_4_value)
-
-            # Calculate the equivalent in GBP based on "C:\\IT project3\\utils\\currencies.xlsx" currencies sheetname, which has ratios of all currencies against GBP.
-            #it should be calculated for each row based on "extra_cell_1" (amount) and "extra_cell_2" (currency). The result should be saved in the "equivalent in GBP" column.
-            #if the currencies don't match with the ones from the currencies.xlsx file, the "equivalent in GBP" column should be empty.
-            #the structure of currencies.xlsx is as follows: columns; A =Currency Full Name, B = Currency Abbreviation, C= Exchange Ratio (1 unit = ? GBP),	D = 1 GBP equals (units)
-
-            # Initialize the equivalent in GBP to an empty value.
-            equivalent_in_GBP_value = None
-
-            # Convert the extra_cell_1_value (amount) to a float.
-            try:
-                numeric_amount = float(extra_cell_1_value)
-            except (ValueError, TypeError):
-                print(f"Unable to convert amount '{extra_cell_1_value}' to a numeric value.")
-                numeric_amount = None
-
-            # Proceed only if the numeric amount is valid and a currency abbreviation is provided.
-            if numeric_amount is not None and extra_cell_2_value is not None:
-                # Define the path to the currencies file.
-                # Ensure this path is correct. If you're running this on Windows, you can use raw strings.
-                currency_file = os.path.join("C:\\IT project3\\utils", "currencies.xlsx")
-                
-                # Load the workbook and select the active worksheet.
-                wb_currency = load_workbook(filename=currency_file)
-                ws_currency = wb_currency.active
-
-                # Iterate through the rows of the currencies file, starting from row 2 to skip the header.
-                for row in ws_currency.iter_rows(min_row=2, values_only=True):
-                    # Assuming the columns are as follows:
-                    #   row[0] = Currency Full Name,
-                    #   row[1] = Currency Abbreviation,
-                    #   row[2] = Exchange Ratio (1 unit of the currency = ? GBP)
-                    if row[1] == extra_cell_2_value:
-                        # Convert the exchange ratio to a float, if it's not already a numeric type.
-                        try:
-                            exchange_ratio = float(row[2])
-                        except (ValueError, TypeError):
-                            print(f"Invalid exchange ratio '{row[2]}' for currency '{extra_cell_2_value}' in currencies.xlsx.")
-                            exchange_ratio = None
-
-                        if exchange_ratio is not None:
-                            equivalent_in_GBP_value = numeric_amount * exchange_ratio
-                            #round to 2 decimal places
-                            equivalent_in_GBP_value = round(equivalent_in_GBP_value, 2)
-                        break  # Exit the loop once a match is found.
-
-            # If no matching currency was found or if the conversion failed, handle accordingly.
-            if extra_cell_2_value is not None and equivalent_in_GBP_value is None:
-                # Assuming excel_file is defined elsewhere in your code, replace with the correct variable if needed.
-                print(f"Currency '{extra_cell_2_value}' not found or invalid exchange ratio in currencies.xlsx for case '{transformed_rng_cell_2}'.")
-                equivalent_in_GBP_value = ""
-
-            # At this point, equivalent_in_GBP_value holds the computed GBP value or remains empty.
-            #print("Equivalent in GBP:", equivalent_in_GBP_value)
-
-            values_excel_files[excel_file.name] = [
-                transformed_rng_cell_1, transformed_rng_cell_2, extra_cell_1_value, extra_cell_2_value, extra_cell_3_value, extra_cell_4_value, extra_cell_5_value, bank_name, transformed_rng_cell_3, equivalent_in_GBP_value,
-            ]
-        return values_excel_files
+        pass #collect values from excel files cells
 
 
     def create_combined_excel(self, values_excel_files):
@@ -732,7 +581,7 @@ class KejsarProcessor:
         worksheet = workbook.active
         worksheet.title = "Sheet"
         
-        header_list = ["uni name", "candidate name", "case nr", "amount", "currency", "acc number", "iban number", "swift/bic", "name in bank", "vendor name", "equivalent in GBP"]
+        header_list = ["uni name", "candidate name", "case nr", "amount", "currency", "acc number"]
         
         # Write headers and data
         for i, header in enumerate(header_list):
@@ -746,40 +595,6 @@ class KejsarProcessor:
                     if value is not None and not isinstance(value, int):
                         value = str(value).replace("\n", "").replace("\xa0", "").replace("\t", "")
                 worksheet[f"{column_letter}{j + 2}"] = value
-
-        # Calculate sum
-        row_index = 11
-        sum_equivalent_in_GBP = sum(cell.value for cell in worksheet[row_index] 
-                                if isinstance(cell.value, (int, float)))
-        #convert to 2 decimal places
-        sum_equivalent_in_GBP = round(sum_equivalent_in_GBP, 2)
-        
-        # Save workbook
-        workbook.save(self.combined_file)
-        
-        # Create and process transposed sheet
-        transposer = ExcelTransposer(self.combined_file)
-        transposer.transpose_cells_to_table()
-        
-        # Add total to column L
-        workbook = load_workbook(self.combined_file)
-        worksheet_transposed = workbook["Transposed"]
-        worksheet_transposed["L1"] = "Total in GBP:"
-        worksheet_transposed["L2"] = sum_equivalent_in_GBP
-
-        #create new sheet named "totals"
-        worksheet_totals = workbook.create_sheet(title="Totals")
-        #copy columns from "Transposed" sheet to "Totals" sheet - column B from Transposed to column A in Totals, D to B, E to C, K to D, L1 to E1, L2 to E2
-        for i in range(1, worksheet_transposed.max_row + 1):
-            worksheet_totals[f"A{i}"] = worksheet_transposed[f"B{i}"].value
-            worksheet_totals[f"B{i}" ] = worksheet_transposed[f"D{i}"].value
-            worksheet_totals[f"C{i}" ] = worksheet_transposed[f"E{i}"].value
-            worksheet_totals[f"D{i}" ] = worksheet_transposed[f"K{i}"].value
-            worksheet_totals[f"E{i}" ] = worksheet_transposed[f"L{i}"].value
-        #save the workbook
-
-        workbook.save(self.combined_file)
-
 
     def adjust_columns(self):
         #transposer = ExcelTransposer(self.combined_file)
@@ -797,7 +612,6 @@ class KejsarProcessor:
 
     def run(self):
         self.process_files()
-        self.print_mismatched_cases()
         values_excel_files = self.collect_values()
         self.create_combined_excel(values_excel_files)
         self.adjust_columns()
