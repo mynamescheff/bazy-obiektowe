@@ -5,7 +5,7 @@ import sqlite3
 import bcrypt
 
 
-#Test test test
+# Test 2
 def zarejestruj(window_2):
     name = name_input.text()
     email = mail_input.text()
