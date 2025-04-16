@@ -167,6 +167,7 @@ login_logowanie.resize(200, 30)
 haslo_logowanie = QLineEdit(window)
 haslo_logowanie.move(300, 300)
 haslo_logowanie.resize(200, 30)
+haslo_logowanie.setEchoMode(QLineEdit.EchoMode.Password)
 
 # Pola tekstowe Rejestracja
 # Imię
