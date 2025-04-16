@@ -1,3 +1,5 @@
+import re
+
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QLabel, QMessageBox, QMainWindow
 import sys
@@ -5,7 +7,19 @@ import sqlite3
 import bcrypt
 
 
-# Test 2
+app = QApplication(sys.argv)
+
+
+def is_valid_email(email):
+    return '@' in email
+
+def is_valid_password(password):
+    return (len(password) >= 8 and
+    re.search(r'[A-Z]', password) and
+    re.search(r'\d', password) )
+
+
+
 def zarejestruj(window_2):
     name = name_input.text()
     email = mail_input.text()
@@ -14,6 +28,16 @@ def zarejestruj(window_2):
 
     if not name or not email or not login or not password:
         QMessageBox.warning(window_2, "Nie podano wszystkich danych potrzebnych do logowania")
+        return False
+
+
+
+    if  not is_valid_email(email):
+        QMessageBox.warning(window_2, "Błąd", "podano niepoprawny adres email")
+        return False
+
+    if not is_valid_password(password):
+        QMessageBox.warning(window_2, "Błąd", "Hasło musi zawierać conajmniej 8 znaków oraz jedną dużą litere i jedną cyfre")
         return False
 
     password_crypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -77,7 +101,7 @@ def zaloguj():
             return False
     except Exception as e:
         QMessageBox.critical(window, "Błąd" , f"Wystąpił błąd: {e}")
-app = QApplication(sys.argv)
+
 
 
 # Ekran Logowania
@@ -169,6 +193,7 @@ button = QPushButton("Add user", window_2)
 button.move(250, 500)
 button.resize(100, 40)
 button.clicked.connect(register_success)
+
 
 
 button = QPushButton("Back", window_2)
