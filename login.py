@@ -1,7 +1,9 @@
 import re
 
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QLabel, QMessageBox, QMainWindow
+from PyQt6.QtGui import QFont, QAction
+from PyQt6.QtSql import QSqlDatabase, QSqlTableModel
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QLabel, QMessageBox, QMainWindow, \
+    QVBoxLayout, QTableView
 import sys
 import sqlite3
 import bcrypt
@@ -89,7 +91,7 @@ class LoginWindow(QWidget):
                         self.main_window.show()
                     return True
                 else:
-                    QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasłow")
+                    QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło")
                     return False
             else:
                 QMessageBox.warning(self, "Błąd", "Nie znaleziono użytkownika")
@@ -105,6 +107,7 @@ class RegisterWindow(QWidget):
         self.setGeometry(100, 100, 800, 600)
         self.RegisterUI()
         self.login_window = login_window
+
 
 
     def RegisterUI(self):
@@ -237,17 +240,86 @@ class RegisterWindow(QWidget):
 
 
 
-class MainWindow(QWidget):
-    def __init__(self):
+class MainWindow(QMainWindow):
+    def __init__(self, register_window, login_window):
         super().__init__()
         self.setWindowTitle("Ekran Główny")
         self.setGeometry(100, 100, 800, 600)
+        self.register_window = register_window
+        self.login_window = login_window
+
+        menu = self.menuBar()
+
+        file_menu = menu.addMenu("File")
+        option1_action = QAction("Test1", self)
+        file_menu.addAction(option1_action)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.back_to_login)
+        file_menu.addAction(exit_action)
+
+        option_menu = menu.addMenu("Option")
+
+        help_menu = menu.addMenu("Help")
+
+        about_menu = menu.addMenu("About")
+        version_action = QAction("Version", self)
+        version_action.triggered.connect(self.version)
+        about_menu.addAction(version_action)
+
+
+
+    def back_to_login(self):
+        self.hide()
+        self.login_window.show()
+
+    def version(self):
+        QMessageBox.information(self, "Program", "Wersja 1.0.0")
 
 class AdminWindow(MainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, register_window, login_window):
+        super().__init__(register_window, login_window)
         self.setWindowTitle("Ekran Administrator")
         self.setGeometry(100, 100, 800, 600)
+        self.register_window = register_window
+        self.login_window = login_window
+
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+
+        menu = self.menuBar()
+        admin_menu = menu.addMenu("Admin")
+        option2_action = QAction("Test2", self)
+        option2_action.triggered.connect(self.employees_menagment)
+        admin_menu.addAction(option2_action)
+
+
+
+    def employees_menagment(self):
+        if self.centralWidget():
+            self.centralWidget().deleteLater()
+
+        central_widget = QWidget()
+        layout = QVBoxLayout(central_widget)
+
+        db = QSqlDatabase.addDatabase("QSQLITE")
+        if not db.isOpen():
+            db.setDatabaseName("project.db")
+            if not db.open():
+                QMessageBox.warning(self, "Błąd", "Nie udało się połączyć z bazą danych")
+                return False
+
+
+        model = QSqlTableModel(self, db)
+        model.setTable("register")
+        model.select()
+
+        table_view = QTableView()
+        table_view.setModel(model)
+
+        layout.addWidget(table_view)
+
+        self.setCentralWidget(central_widget)
+
 
 
 
@@ -257,12 +329,15 @@ class AdminWindow(MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    main_window = MainWindow()
-    admin_window = AdminWindow()
 
-    register_window = RegisterWindow(None)  # tymczasowo bez login_window
+    register_window = RegisterWindow(None)
+    main_window = MainWindow(register_window=register_window, login_window=None)
+    admin_window = AdminWindow(register_window=register_window, login_window=None)
     login_window = LoginWindow(register_window=register_window, main_window=main_window, admin_window=admin_window)
-    register_window.login_window = login_window  # poprawne przypisanie
+
+    register_window.login_window = login_window
+    main_window.login_window = login_window
+    admin_window.login_window = login_window
 
     login_window.show()
     sys.exit(app.exec())
