@@ -1,15 +1,15 @@
 import re
+from functools import partial
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
 from PyQt6.QtSql import QSqlDatabase, QSqlTableModel
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QLabel, QMessageBox, QMainWindow, \
-    QVBoxLayout, QTableView
+    QVBoxLayout, QTableView, QInputDialog, QStyledItemDelegate, QToolButton, QDialog
 import sys
 import sqlite3
 import bcrypt
-
-
-
+from pyexpat import model
 
 
 class LoginWindow(QWidget):
@@ -254,7 +254,7 @@ class MainWindow(QMainWindow):
         option1_action = QAction("Test1", self)
         file_menu.addAction(option1_action)
         exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.back_to_login)
+        exit_action.triggered.connect(self.back_or_quit)
         file_menu.addAction(exit_action)
 
         option_menu = menu.addMenu("Option")
@@ -275,6 +275,33 @@ class MainWindow(QMainWindow):
     def version(self):
         QMessageBox.information(self, "Program", "Wersja 1.0.0")
 
+    def back_or_quit(self):
+        quit_box = QMessageBox(self)
+        quit_box.setIcon(QMessageBox.Icon.Question)
+        quit_box.setWindowTitle("Zamknij aplikacje")
+        quit_box.setText("Czy chcesz zamknąć aplikacje ?\n Wrócić do okna logowania")
+
+        close_button = quit_box.addButton("Zakmnij aplikacje", QMessageBox.ButtonRole.YesRole)
+        back_button  = quit_box.addButton("Powrót do logowania", QMessageBox.ButtonRole.NoRole)
+        cancel_button = quit_box.addButton("Anuluj", QMessageBox.ButtonRole.RejectRole)
+
+        quit_box.exec()
+
+        if  quit_box.clickedButton() == close_button:
+            QApplication.quit()
+        elif quit_box.clickedButton() == back_button:
+            self.back_to_login()
+        else:
+            pass
+
+
+
+
+
+
+
+
+
 class AdminWindow(MainWindow):
     def __init__(self, register_window, login_window):
         super().__init__(register_window, login_window)
@@ -289,12 +316,10 @@ class AdminWindow(MainWindow):
         menu = self.menuBar()
         admin_menu = menu.addMenu("Admin")
         option2_action = QAction("Test2", self)
-        option2_action.triggered.connect(self.employees_menagment)
+        option2_action.triggered.connect(self.register_data)
         admin_menu.addAction(option2_action)
 
-
-
-    def employees_menagment(self):
+    def register_data(self):
         if self.centralWidget():
             self.centralWidget().deleteLater()
 
@@ -306,26 +331,56 @@ class AdminWindow(MainWindow):
             db.setDatabaseName("project.db")
             if not db.open():
                 QMessageBox.warning(self, "Błąd", "Nie udało się połączyć z bazą danych")
-                return False
+                return
+
+        self.model = QSqlTableModel(self, db)
+        self.model.setTable("register")
+        self.model.select()
+
+        self.table_view = QTableView()
+        self.table_view.setModel(self.model)
+        self.table_view.setColumnHidden(0, True)
 
 
-        model = QSqlTableModel(self, db)
-        model.setTable("register")
-        model.select()
+        if self.model.columnCount() <= 5:
+            self.model.insertColumn(self.model.columnCount())
+            self.model.setHeaderData(self.model.columnCount() - 1, Qt.Orientation.Horizontal, "Delete")
 
-        table_view = QTableView()
-        table_view.setModel(model)
+            self.model.insertColumn(self.model.columnCount())
+            self.model.setHeaderData(self.model.columnCount() - 1, Qt.Orientation.Horizontal, "Edit")
 
-        layout.addWidget(table_view)
 
+        self.add_button()
+
+        layout.addWidget(self.table_view)
         self.setCentralWidget(central_widget)
 
+    def add_button(self):
+        delete_column = self.model.columnCount() - 2
+        edit_column = self.model.columnCount() - 1
 
 
+        for row in range(self.model.rowCount()):
+            delete_button = QPushButton("Delete")
+            delete_button.setStyleSheet("background-color: red; color: white;")
+            delete_button.clicked.connect(partial(self.delete_record, row))
+
+            edit_button = QPushButton("Edit")
+            edit_button.setStyleSheet("background-color: blue; color: white;")
+            # edit_button.clicked.connect(partial(self.edit_record, row))
 
 
+            self.table_view.setIndexWidget(self.model.index(row, delete_column), delete_button)
+            self.table_view.setIndexWidget(self.model.index(row, edit_column), edit_button)
 
+    def delete_record(self, row):
+        confirm = QMessageBox.question(self, "Potwierdzenie", "Czy na pewno chcesz usunąć tego użytkownika?",
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
+        if confirm == QMessageBox.StandardButton.Yes:
+            self.model.removeRow(row)
+            self.model.submitAll()
+            self.register_data()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
