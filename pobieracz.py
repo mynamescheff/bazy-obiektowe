@@ -40,7 +40,7 @@ class CaseList:
                 try:
                     wb = load_workbook(file_path)
                     sheet = wb.active
-                    value = sheet["B17"].value
+                    value = sheet["G2"].value
                     if value:
                         # Clean the value
                         value = self._clean_string(value)
@@ -60,13 +60,23 @@ class CaseList:
                     
         if all_entries:
             today = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(list_file_path), exist_ok=True)
+            
+            # Create the file if it doesn't exist
+            if not os.path.exists(list_file_path):
+                with open(list_file_path, "w", encoding="utf-8") as file:
+                    file.write(f"--- Case List Created on {today} ---\n")
+            
+            # Append the new entries
             with open(list_file_path, "a", encoding="utf-8") as file:
                 file.write(f"\n--- Updated on {today} ---\n")
                 for entry in all_entries:
                     file.write(f"{entry} ({today})\n")
-                    
-        print("Cases processed successfully and saved to the case_list.txt file.")
-        return duplicate_counts, error_messages
+                            
+                print("Cases processed successfully and saved to the case_list.txt file.")
+                return duplicate_counts, error_messages
 
     def _clean_string(self, value):
         if not value:
@@ -422,17 +432,10 @@ class ExcelDataScraper:
     def set_directory(self, directory):
         self.directory = directory
         
-    def scrape_excel_files(self, range_start="A2", range_end="F2", read_headers=True):
+    def scrape_excel_files(self, range_start="G2", range_end="G2", read_headers=True):
         """
         Scrape values from Excel files in the specified directory.
-        
-        Args:
-            range_start: Starting cell of the range (e.g., "A2")
-            range_end: Ending cell of the range (e.g., "F2")
-            read_headers: Whether to read headers from the first row
-            
-        Returns:
-            A list of dictionaries with headers and values
+        Default is now G2 cell specifically.
         """
         if not self.directory or not os.path.isdir(self.directory):
             raise ValueError("Please set a valid directory first.")
@@ -529,6 +532,57 @@ class ExcelDataScraper:
         except Exception as e:
             print(f"Error saving results: {str(e)}")
             return False
+        
+    def save_results_to_excel(self, output_file):
+        """Save scraped results to an Excel file"""
+        if not self.results:
+            print("No results to save.")
+            return False
+            
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Combined Data"
+            
+            # Write headers
+            if self.headers:
+                headers = ['filename'] + self.headers
+            else:
+                # Use the keys from the first result's values
+                headers = ['filename'] + list(self.results[0]['values'].keys())
+                
+            for col_idx, header in enumerate(headers, 1):
+                ws.cell(row=1, column=col_idx, value=header)
+            
+            # Write data
+            for row_idx, result in enumerate(self.results, 2):
+                ws.cell(row=row_idx, column=1, value=result['filename'])
+                
+                for col_idx, header in enumerate(headers[1:], 2):
+                    value = result['values'].get(header, "")
+                    ws.cell(row=row_idx, column=col_idx, value=value)
+                    
+            # Auto-adjust column widths
+            for column in ws.columns:
+                max_length = 0
+                column_letter = get_column_letter(column[0].column)
+                
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column_letter].width = adjusted_width
+                    
+            wb.save(output_file)
+            print(f"Results saved to Excel file: {output_file}")
+            return True
+        except Exception as e:
+            print(f"Error saving results to Excel: {str(e)}")
+            return False
 
 class ExcelProcessorApp:
     def __init__(self, root):
@@ -566,6 +620,32 @@ class ExcelProcessorApp:
         status_frame = ttk.Frame(root)
         status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
+
+    def export_to_excel(self):
+        try:
+            if not self.excel_scraper.get_results():
+                messagebox.showerror("Error", "No data to export. Please scrape Excel files first.")
+                return
+                
+            output_file = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")]
+            )
+            
+            if not output_file:
+                return  # User cancelled
+                
+            success = self.excel_scraper.save_results_to_excel(output_file)
+            
+            if success:
+                messagebox.showinfo("Success", f"Data exported to {output_file}")
+                self.status_var.set("Data exported to Excel")
+            else:
+                messagebox.showerror("Error", "Failed to export data")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Export error: {str(e)}")
+            self.status_var.set("Error exporting data")
 
     def setup_outlook_tab(self):
         # Create form for Outlook processor
@@ -613,6 +693,7 @@ class ExcelProcessorApp:
         outlook_scrollbar = ttk.Scrollbar(self.outlook_tab, command=self.outlook_result_text.yview)
         outlook_scrollbar.grid(row=7, column=2, sticky='nsew')
         self.outlook_result_text.config(yscrollcommand=outlook_scrollbar.set)
+
 
     def setup_case_list_tab(self):
         ttk.Label(self.case_list_tab, text="Excel Files Folder:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
@@ -667,6 +748,7 @@ class ExcelProcessorApp:
         self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
         self.scrape_dir_entry.pack(side=tk.LEFT)
         ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(self.scrape_dir_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
         
         # Range selection
         range_frame = ttk.Frame(self.scrape_tab)
@@ -677,7 +759,6 @@ class ExcelProcessorApp:
         self.range_start_entry = ttk.Entry(range_frame, width=8)
         self.range_start_entry.pack(side=tk.LEFT, padx=5)
         self.range_start_entry.insert(0, "A2")
-        
         ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
         self.range_end_entry = ttk.Entry(range_frame, width=8)
         self.range_end_entry.pack(side=tk.LEFT, padx=5)
@@ -696,6 +777,7 @@ class ExcelProcessorApp:
         
         # Results display
         ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
+        
         
         # Create a Frame to contain the Text widget and scrollbars
         results_frame = ttk.Frame(self.scrape_tab)
