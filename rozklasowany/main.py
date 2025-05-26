@@ -1,14 +1,10 @@
-import os
-import re
 import tkinter as tk
-from datetime import datetime
-from openpyxl import load_workbook
 from tkinter import *
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 import threading
 import sqlite3
-from modules.excel_scraper import ExcelDataScraper
+from rozklasowany.modules.excel_data_scraper import ExcelDataScraper
 from modules.excel_transposer import ExcelTransposer
 from modules.outlook_processor import OutlookProcessor
 from modules.case_list import CaseList
@@ -558,4 +554,9 @@ class ExcelProcessorApp:
         except Exception as e:
             messagebox.showerror("Error", f"Database error: {str(e)}")
             self.status_var.set("Error adding data to database")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ExcelProcessorApp(root)
+    root.mainloop()
         
