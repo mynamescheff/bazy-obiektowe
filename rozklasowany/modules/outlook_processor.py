@@ -6,6 +6,7 @@ import shutil
 from datetime import datetime
 from ..utils.constants import SHARED_MAILBOX_EMAIL
 
+SHARED_MAILBOX_EMAIL = SHARED_MAILBOX_EMAIL  # Ensure this constant is defined in your constants module
 
 class OutlookProcessor:
     def __init__(self, category, target_senders, attachment_save_path, msg_save_path):
