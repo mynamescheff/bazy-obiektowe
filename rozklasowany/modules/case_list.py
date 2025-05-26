@@ -29,16 +29,16 @@ class CaseList:
                         # Clean the value
                         value = self._clean_string(value)
                         
-                        if value in existing_values:
-                            duplicate_counts[value] = duplicate_counts.get(value, 0) + 1
-                            entry = f"{value} [{file_name} - DUPLICATE {duplicate_counts[value]}]"
-                            all_entries.append(entry)
-                            print(f"Duplicate found: {value} in file {file_name} (Duplicate count: {duplicate_counts[value]})")
-                        else:
-                            existing_values[value] = False
-                            duplicate_counts[value] = 0
-                            entry = f"{value} [{file_name}]"
-                            all_entries.append(entry)
+                    if value in existing_values:
+                        duplicate_counts[value] = duplicate_counts.get(value, 0) + 1
+                        entry = f"case number: {value} [{file_name} - DUPLICATE {duplicate_counts[value]}]"
+                        all_entries.append(entry)
+                        print(f"Duplicate found: {value} in file {file_name} (Duplicate count: {duplicate_counts[value]})")
+                    else:
+                        existing_values[value] = False
+                        duplicate_counts[value] = 0
+                        entry = f"case number: {value} [{file_name}]"
+                        all_entries.append(entry)
                 except Exception as e:
                     error_messages.append(f"Error processing file '{file_name}': {str(e)}")
                     
@@ -85,10 +85,10 @@ class CaseList:
         with open(list_file_path, "r", encoding="utf-8") as file:
             for line in file:
                 if line.strip() and not line.startswith("---"):
-                    parts = line.split(" [")
-                    if len(parts) > 1:
-                        value = parts[0]
+                    match = re.match(r"case number: (.+?) \[", line)
+                    if match:
+                        value = match.group(1)
                         existing_values[value] = False
-                        duplicate_count = parts[1].count("DUPLICATE")
+                        duplicate_count = line.count("DUPLICATE")
                         duplicate_counts[value] = duplicate_count
         return existing_values, duplicate_counts

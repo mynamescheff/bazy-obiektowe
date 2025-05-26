@@ -188,7 +188,7 @@ class ExcelProcessorApp:
         ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
         self.range_end_entry = ttk.Entry(range_frame, width=8)
         self.range_end_entry.pack(side=tk.LEFT, padx=5)
-        self.range_end_entry.insert(0, "F2")
+        self.range_end_entry.insert(0, "G2")
         
         # Read headers option
         self.read_headers_var = BooleanVar(value=True)

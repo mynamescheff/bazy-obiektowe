@@ -13,10 +13,9 @@ class ExcelDataScraper:
     def set_directory(self, directory):
         self.directory = directory
         
-    def scrape_excel_files(self, range_start="G2", range_end="G2", read_headers=True):
+    def scrape_excel_files(self, range_start="A2", range_end="G2", read_headers=True):
         """
         Scrape values from Excel files in the specified directory.
-        Default is now G2 cell specifically.
         """
         if not self.directory or not os.path.isdir(self.directory):
             raise ValueError("Please set a valid directory first.")

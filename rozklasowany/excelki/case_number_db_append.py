@@ -34,10 +34,10 @@ def scrape_case_numbers():
         df = pd.read_excel(file_path)
 
         # Check if 'case number' column exists
-        if 'Case Number' in df.columns:
+        if 'case number' in df.columns:
             for index, row in df.iterrows():
-                case_number = row['Case Number']
-                case_data.append({'Case Number': case_number})
+                case_number = row['case number']
+                case_data.append({'case number': case_number})
 
     # Create a DataFrame from collected data
     case_df = pd.DataFrame(case_data)
@@ -48,7 +48,7 @@ def scrape_case_numbers():
     if os.path.exists(db_file_path):
         # Read existing data
         try:
-            existing_df = pd.read_excel(db_file_path, sheet_name='Case Numbers')
+            existing_df = pd.read_excel(db_file_path, sheet_name='case numbers')
         except Exception:
             existing_df = pd.DataFrame()
         # Concatenate old and new data
@@ -58,7 +58,7 @@ def scrape_case_numbers():
 
     # Save the combined DataFrame to the Excel file
     with pd.ExcelWriter(db_file_path, engine='openpyxl') as writer:
-        combined_df.to_excel(writer, sheet_name='Case Numbers', index=False)
+        combined_df.to_excel(writer, sheet_name='case numbers', index=False)
 
     print(f"Scraped case numbers and saved to {db_file_path} successfully.")
 
