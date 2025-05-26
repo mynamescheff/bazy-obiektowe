@@ -533,24 +533,13 @@ class ExcelProcessorApp:
             if not self.excel_scraper.get_results():
                 messagebox.showerror("Error", "No data to add. Please scrape Excel files first.")
                 return
-                
-            db_file = filedialog.asksaveasfilename(
-                defaultextension=".db",
-                filetypes=[("SQLite Database", "*.db"), ("All Files", "*.*")]
-            )
-            
-            if not db_file:
-                return  # User cancelled
-                
-            db_handler = DatabaseHandler(db_file)
-            success = db_handler.add_data(self.excel_scraper.get_results())
-            
-            if success:
-                messagebox.showinfo("Success", f"Data added to database {db_file}")
-                self.status_var.set("Data added to database")
-            else:
-                messagebox.showerror("Error", "Failed to add data to database")
-                
+
+            db_handler = DatabaseHandler()
+            # You may need to set the data to db_handler before calling add_to_database
+            db_handler.excel_data = self.excel_scraper.get_results()
+            db_handler.status_var = self.status_var  # Pass status_var for UI updates if needed
+            db_handler.add_to_database()
+
         except Exception as e:
             messagebox.showerror("Error", f"Database error: {str(e)}")
             self.status_var.set("Error adding data to database")
@@ -559,4 +548,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = ExcelProcessorApp(root)
     root.mainloop()
-        
+
