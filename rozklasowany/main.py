@@ -168,71 +168,75 @@ class ExcelProcessorApp:
         self.transpose_result_text.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
     
     def setup_scrape_tab(self):
-        ttk.Label(self.scrape_tab, text="Excel Files Directory:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-        self.scrape_dir_frame = ttk.Frame(self.scrape_tab)
-        self.scrape_dir_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-        self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
-        self.scrape_dir_entry.pack(side=tk.LEFT)
-        ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(self.scrape_dir_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
-        
-        # Range selection
-        range_frame = ttk.Frame(self.scrape_tab)
-        range_frame.grid(row=1, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-        
-        ttk.Label(range_frame, text="Cell Range:").pack(side=tk.LEFT, padx=5)
-        ttk.Label(range_frame, text="From:").pack(side=tk.LEFT, padx=5)
-        self.range_start_entry = ttk.Entry(range_frame, width=8)
-        self.range_start_entry.pack(side=tk.LEFT, padx=5)
-        self.range_start_entry.insert(0, "A2")
-        ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
-        self.range_end_entry = ttk.Entry(range_frame, width=8)
-        self.range_end_entry.pack(side=tk.LEFT, padx=5)
-        self.range_end_entry.insert(0, "G2")
-        
-        # Read headers option
-        self.read_headers_var = BooleanVar(value=True)
-        ttk.Checkbutton(self.scrape_tab, text="Read headers from first row", variable=self.read_headers_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-        
-        # Buttons
-        buttons_frame = ttk.Frame(self.scrape_tab)
-        buttons_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
-        
-        ttk.Button(buttons_frame, text="Scrape Excel Files", command=self.scrape_excel_files).pack(side=tk.LEFT, padx=5)
-        ttk.Button(buttons_frame, text="Export to CSV", command=self.export_to_csv).pack(side=tk.LEFT, padx=5)
-        #add a button to take data from scraped file and add it to a database
-        ttk.Button(buttons_frame, text="Add to Database", command=self.add_to_database).pack(side=tk.LEFT, padx=5)
-        
-        # Results display
-        ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
-        
-        
-        # Create a Frame to contain the Text widget and scrollbars
-        results_frame = ttk.Frame(self.scrape_tab)
-        results_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky='nsew')
-        
-        # Make the frame expandable
-        self.scrape_tab.rowconfigure(5, weight=1)
-        self.scrape_tab.columnconfigure(1, weight=1)
-        
-        # Create Text widget with scrollbars
-        self.scrape_result_text = Text(results_frame, height=15, width=80)
-        
-        # Add scrollbars
-        v_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.scrape_result_text.yview)
-        h_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.scrape_result_text.xview)
-        
-        # Configure the Text widget to use the scrollbars
-        self.scrape_result_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set, wrap="none")
-        
-        # Place widgets in the frame
-        self.scrape_result_text.grid(row=0, column=0, sticky='nsew')
-        v_scrollbar.grid(row=0, column=1, sticky='ns')
-        h_scrollbar.grid(row=1, column=0, sticky='ew')
-        
-        # Make the Text widget expandable within its frame
-        results_frame.rowconfigure(0, weight=1)
-        results_frame.columnconfigure(0, weight=1)
+            ttk.Label(self.scrape_tab, text="Excel Files Directory:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
+            self.scrape_dir_frame = ttk.Frame(self.scrape_tab)
+            self.scrape_dir_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
+            self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
+            self.scrape_dir_entry.pack(side=tk.LEFT)
+            ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
+            # CHANGE START: Moved "Scrape Excel Files" button here
+            ttk.Button(self.scrape_dir_frame, text="Scrape Excel Files", command=self.scrape_excel_files).pack(side=tk.LEFT, padx=5)
+            # CHANGE END
+            
+            # Range selection
+            range_frame = ttk.Frame(self.scrape_tab)
+            range_frame.grid(row=1, column=0, columnspan=2, sticky=W, padx=10, pady=5)
+            
+            ttk.Label(range_frame, text="Cell Range:").pack(side=tk.LEFT, padx=5)
+            ttk.Label(range_frame, text="From:").pack(side=tk.LEFT, padx=5)
+            self.range_start_entry = ttk.Entry(range_frame, width=8)
+            self.range_start_entry.pack(side=tk.LEFT, padx=5)
+            self.range_start_entry.insert(0, "A2")
+            ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
+            self.range_end_entry = ttk.Entry(range_frame, width=8)
+            self.range_end_entry.pack(side=tk.LEFT, padx=5)
+            self.range_end_entry.insert(0, "G2")
+            
+            # Read headers option
+            self.read_headers_var = BooleanVar(value=True)
+            ttk.Checkbutton(self.scrape_tab, text="Read headers from first row", variable=self.read_headers_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=10, pady=5)
+            
+            # Buttons
+            buttons_frame = ttk.Frame(self.scrape_tab)
+            buttons_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+            
+            # CHANGE START: Moved "Export to Excel" button here
+            ttk.Button(buttons_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
+            # CHANGE END
+            ttk.Button(buttons_frame, text="Export to CSV", command=self.export_to_csv).pack(side=tk.LEFT, padx=5)
+            #add a button to take data from scraped file and add it to a database
+            ttk.Button(buttons_frame, text="Add to Database", command=self.add_to_database).pack(side=tk.LEFT, padx=5)
+            
+            # Results display
+            ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
+            
+            
+            # Create a Frame to contain the Text widget and scrollbars
+            results_frame = ttk.Frame(self.scrape_tab)
+            results_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky='nsew')
+            
+            # Make the frame expandable
+            self.scrape_tab.rowconfigure(5, weight=1)
+            self.scrape_tab.columnconfigure(1, weight=1)
+            
+            # Create Text widget with scrollbars
+            self.scrape_result_text = Text(results_frame, height=15, width=80)
+            
+            # Add scrollbars
+            v_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.scrape_result_text.yview)
+            h_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.scrape_result_text.xview)
+            
+            # Configure the Text widget to use the scrollbars
+            self.scrape_result_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set, wrap="none")
+            
+            # Place widgets in the frame
+            self.scrape_result_text.grid(row=0, column=0, sticky='nsew')
+            v_scrollbar.grid(row=0, column=1, sticky='ns')
+            h_scrollbar.grid(row=1, column=0, sticky='ew')
+            
+            # Make the Text widget expandable within its frame
+            results_frame.rowconfigure(0, weight=1)
+            results_frame.columnconfigure(0, weight=1)
 
     def browse_directory(self, entry_widget):
         directory = filedialog.askdirectory()
@@ -534,15 +538,15 @@ class ExcelProcessorApp:
                 messagebox.showerror("Error", "No data to add. Please scrape Excel files first.")
                 return
 
-            db_handler = DatabaseHandler()
-            # You may need to set the data to db_handler before calling add_to_database
-            db_handler.excel_data = self.excel_scraper.get_results()
-            db_handler.status_var = self.status_var  # Pass status_var for UI updates if needed
+            db_handler = DatabaseHandler(status_var=self.status_var)
+            # You may need this only if you still want to pass scraped results
+            # but in the refactored version above, we bypass scraped data.
             db_handler.add_to_database()
 
         except Exception as e:
             messagebox.showerror("Error", f"Database error: {str(e)}")
             self.status_var.set("Error adding data to database")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
