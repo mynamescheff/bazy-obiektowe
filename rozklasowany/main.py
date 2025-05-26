@@ -3,10 +3,6 @@ import re
 import tkinter as tk
 from datetime import datetime
 from openpyxl import load_workbook
-from openpyxl.utils.exceptions import InvalidFileException
-from openpyxl.utils.exceptions import FileNotFoundError
-from openpyxl.utils.exceptions import InvalidFileException
-from openpyxl.utils.exceptions import InvalidFileException
 from tkinter import *
 from tkinter import filedialog, messagebox
 from tkinter import ttk
