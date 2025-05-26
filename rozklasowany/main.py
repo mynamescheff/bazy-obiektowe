@@ -3,46 +3,55 @@ from tkinter import *
 from tkinter import filedialog, messagebox
 from tkinter import ttk
 import threading
-import sqlite3
+import os
 from modules.excel_data_scraper import ExcelDataScraper
 from modules.excel_transposer import ExcelTransposer
 from modules.outlook_processor import OutlookProcessor
 from modules.case_list import CaseList
 from utils.database_handler import DatabaseHandler
+from utils.database_handler import DatabaseHandler, COMBINED_DB_PATH_FOR_VERIFICATION, BANK_ACC_DB_PATH_FOR_VERIFICATION
+from modules import relational_db_operations # New module for relational DB functions
+
 
 class ExcelProcessorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Excel Processor Tool")
-        self.root.geometry("800x600")
+        self.root.geometry("850x700") # Increased size for new tab content
+
+        # --- Centralized Status Variable ---
+        self.status_var = tk.StringVar()
+        self.status_var.set("Ready")
+
+        # --- Initialize Components ---
+        self.excel_scraper = ExcelDataScraper()
+        # Initialize DatabaseHandler instance to be used across tabs
+        self.db_handler = DatabaseHandler(status_var=self.status_var)
         
-        # Create a notebook with tabs
+        # --- Notebook with Tabs ---
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Create frames for each tab
+        # --- Create Frames for each Tab ---
         self.outlook_tab = ttk.Frame(self.notebook)
         self.case_list_tab = ttk.Frame(self.notebook)
-        self.transpose_tab = ttk.Frame(self.notebook)
+        # self.transpose_tab = ttk.Frame(self.notebook) # Was commented out
         self.scrape_tab = ttk.Frame(self.notebook)
-        
+        self.db_utils_tab = ttk.Frame(self.notebook) # New tab
+
         self.notebook.add(self.outlook_tab, text="Outlook Processor")
         self.notebook.add(self.case_list_tab, text="Case List")
-        #self.notebook.add(self.transpose_tab, text="Excel Transpose")
         self.notebook.add(self.scrape_tab, text="Excel Scraper")
+        self.notebook.add(self.db_utils_tab, text="Database Utilities") # Add new tab
         
-        # Setup tabs
+        # --- Setup Tabs ---
         self.setup_outlook_tab()
         self.setup_case_list_tab()
-        self.setup_transpose_tab()
+        # self.setup_transpose_tab() # Was commented out
         self.setup_scrape_tab()
+        self.setup_db_utils_tab() # Setup new tab
         
-        # Initialize components
-        self.excel_scraper = ExcelDataScraper()
-        self.status_var = tk.StringVar()
-        self.status_var.set("Ready")
-        
-        # Status bar at the bottom
+        # --- Status Bar at the Bottom ---
         status_frame = ttk.Frame(root)
         status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
@@ -168,75 +177,152 @@ class ExcelProcessorApp:
         self.transpose_result_text.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
     
     def setup_scrape_tab(self):
-            ttk.Label(self.scrape_tab, text="Excel Files Directory:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-            self.scrape_dir_frame = ttk.Frame(self.scrape_tab)
-            self.scrape_dir_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-            self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
-            self.scrape_dir_entry.pack(side=tk.LEFT)
-            ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
-            # CHANGE START: Moved "Scrape Excel Files" button here
-            ttk.Button(self.scrape_dir_frame, text="Scrape Excel Files", command=self.scrape_excel_files).pack(side=tk.LEFT, padx=5)
-            # CHANGE END
-            
-            # Range selection
-            range_frame = ttk.Frame(self.scrape_tab)
-            range_frame.grid(row=1, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-            
-            ttk.Label(range_frame, text="Cell Range:").pack(side=tk.LEFT, padx=5)
-            ttk.Label(range_frame, text="From:").pack(side=tk.LEFT, padx=5)
-            self.range_start_entry = ttk.Entry(range_frame, width=8)
-            self.range_start_entry.pack(side=tk.LEFT, padx=5)
-            self.range_start_entry.insert(0, "A2")
-            ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
-            self.range_end_entry = ttk.Entry(range_frame, width=8)
-            self.range_end_entry.pack(side=tk.LEFT, padx=5)
-            self.range_end_entry.insert(0, "G2")
-            
-            # Read headers option
-            self.read_headers_var = BooleanVar(value=True)
-            ttk.Checkbutton(self.scrape_tab, text="Read headers from first row", variable=self.read_headers_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-            
-            # Buttons
-            buttons_frame = ttk.Frame(self.scrape_tab)
-            buttons_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
-            
-            # CHANGE START: Moved "Export to Excel" button here
-            ttk.Button(buttons_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
-            # CHANGE END
-            ttk.Button(buttons_frame, text="Export to CSV", command=self.export_to_csv).pack(side=tk.LEFT, padx=5)
-            #add a button to take data from scraped file and add it to a database
-            ttk.Button(buttons_frame, text="Add to Database", command=self.add_to_database).pack(side=tk.LEFT, padx=5)
-            
-            # Results display
-            ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
-            
-            
-            # Create a Frame to contain the Text widget and scrollbars
-            results_frame = ttk.Frame(self.scrape_tab)
-            results_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky='nsew')
-            
-            # Make the frame expandable
-            self.scrape_tab.rowconfigure(5, weight=1)
-            self.scrape_tab.columnconfigure(1, weight=1)
-            
-            # Create Text widget with scrollbars
-            self.scrape_result_text = Text(results_frame, height=15, width=80)
-            
-            # Add scrollbars
-            v_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.scrape_result_text.yview)
-            h_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.scrape_result_text.xview)
-            
-            # Configure the Text widget to use the scrollbars
-            self.scrape_result_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set, wrap="none")
-            
-            # Place widgets in the frame
-            self.scrape_result_text.grid(row=0, column=0, sticky='nsew')
-            v_scrollbar.grid(row=0, column=1, sticky='ns')
-            h_scrollbar.grid(row=1, column=0, sticky='ew')
-            
-            # Make the Text widget expandable within its frame
-            results_frame.rowconfigure(0, weight=1)
-            results_frame.columnconfigure(0, weight=1)
+        ttk.Label(self.scrape_tab, text="Excel Files Directory:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
+        self.scrape_dir_frame = ttk.Frame(self.scrape_tab)
+        self.scrape_dir_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
+        self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
+        self.scrape_dir_entry.pack(side=tk.LEFT)
+        ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(self.scrape_dir_frame, text="Scrape Excel Files", command=self.scrape_excel_files).pack(side=tk.LEFT, padx=5)
+        
+        range_frame = ttk.Frame(self.scrape_tab)
+        range_frame.grid(row=1, column=0, columnspan=2, sticky=W, padx=10, pady=5)
+        
+        ttk.Label(range_frame, text="Cell Range:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(range_frame, text="From:").pack(side=tk.LEFT, padx=5)
+        self.range_start_entry = ttk.Entry(range_frame, width=8)
+        self.range_start_entry.pack(side=tk.LEFT, padx=5)
+        self.range_start_entry.insert(0, "A2")
+        ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
+        self.range_end_entry = ttk.Entry(range_frame, width=8)
+        self.range_end_entry.pack(side=tk.LEFT, padx=5)
+        self.range_end_entry.insert(0, "G2")
+        
+        self.read_headers_var = BooleanVar(value=True)
+        ttk.Checkbutton(self.scrape_tab, text="Read headers from first row", variable=self.read_headers_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=10, pady=5)
+        
+        buttons_frame = ttk.Frame(self.scrape_tab)
+        buttons_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+        
+        ttk.Button(buttons_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(buttons_frame, text="Export to CSV", command=self.export_to_csv).pack(side=tk.LEFT, padx=5)
+        
+        # Modified "Add to Database" button to use the central db_handler instance
+        # This button will call DatabaseHandler's add_to_database, which prompts for .txt and .xlsx files
+        ttk.Button(buttons_frame, text="Files to DB (.txt/.xlsx)", command=self.db_handler.add_to_database).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
+        results_frame = ttk.Frame(self.scrape_tab)
+        results_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky='nsew')
+        
+        self.scrape_tab.rowconfigure(5, weight=1)
+        self.scrape_tab.columnconfigure(1, weight=1) # column 0 and 1 are used, so columnspan 2
+        
+        self.scrape_result_text = Text(results_frame, height=15, width=80)
+        v_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.scrape_result_text.yview)
+        h_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.scrape_result_text.xview)
+        self.scrape_result_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set, wrap="none")
+        
+        self.scrape_result_text.grid(row=0, column=0, sticky='nsew')
+        v_scrollbar.grid(row=0, column=1, sticky='ns')
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
+        
+        results_frame.rowconfigure(0, weight=1)
+        results_frame.columnconfigure(0, weight=1)
+
+    def setup_db_utils_tab(self): # MODIFIED
+        # --- Section for Bank Account Verification ---
+        verify_frame = ttk.LabelFrame(self.db_utils_tab, text="Bank Account Verification")
+        verify_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        # Using os.path.abspath to show full paths in GUI for clarity
+        verify_desc = (f"Checks bank accounts from:\n'{os.path.abspath(COMBINED_DB_PATH_FOR_VERIFICATION)}'\n"
+                       f"against:\n'{os.path.abspath(BANK_ACC_DB_PATH_FOR_VERIFICATION)}'.\n"
+                       f"Ensure files exist and are formatted (table 'data', columns 'university', 'bank account').")
+        ttk.Label(verify_frame, text=verify_desc, wraplength=780, justify=tk.LEFT).pack(padx=5, pady=5)
+        ttk.Button(verify_frame, text="Verify Bank Accounts", command=self.run_verify_bank_accounts).pack(pady=5)
+
+        # --- Section for Relational Database Project ---
+        project_db_frame = ttk.LabelFrame(self.db_utils_tab, text=f"Relational Project Database ({os.path.basename(relational_db_operations.PROJECT_DB_PATH)})")
+        project_db_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        setup_frame = ttk.Frame(project_db_frame)
+        setup_frame.pack(fill=tk.X, pady=5)
+        ttk.Button(setup_frame, text="Setup/Verify Project Schema", command=self.run_setup_project_schema).pack(side=tk.LEFT, padx=5)
+        # MODIFIED Button: from "Add Sample Project Data" to "Populate from Combined.db"
+        ttk.Button(setup_frame, text="Populate DB from Combined.db", command=self.run_populate_project_data_from_combined_db).pack(side=tk.LEFT, padx=5)
+        
+        query_frame = ttk.Frame(project_db_frame)
+        query_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Label(query_frame, text="University Name:").grid(row=0, column=0, padx=5, pady=2, sticky=tk.W)
+        # MODIFIED: Entry to Combobox for University
+        self.db_uni_name_combo = ttk.Combobox(query_frame, width=38, state="readonly") # state readonly after populating
+        self.db_uni_name_combo.grid(row=0, column=1, padx=5, pady=2, sticky=tk.W)
+        ttk.Button(query_frame, text="Refresh Uni List", command=self.load_university_combo_data).grid(row=0, column=2, padx=2, pady=2) # Refresh button
+        ttk.Button(query_frame, text="Show Cases for University", command=self.run_display_cases_for_university).grid(row=0, column=3, padx=5, pady=2)
+
+
+        ttk.Label(query_frame, text="Case Number:").grid(row=1, column=0, padx=5, pady=2, sticky=tk.W)
+        # MODIFIED: Entry to Combobox for Case Number
+        self.db_case_num_combo = ttk.Combobox(query_frame, width=38, state="readonly")
+        self.db_case_num_combo.grid(row=1, column=1, padx=5, pady=2, sticky=tk.W)
+        ttk.Button(query_frame, text="Refresh Case List", command=self.load_case_number_combo_data).grid(row=1, column=2, padx=2, pady=2) # Refresh button
+        ttk.Button(query_frame, text="Show University for Case", command=self.run_display_university_for_case).grid(row=1, column=3, padx=5, pady=2)
+        
+        ttk.Button(query_frame, text="Show Users with Bank Accounts (All)", command=self.run_display_users_with_bank_accounts).grid(row=2, column=0, columnspan=4, pady=10)
+
+        results_label = ttk.Label(self.db_utils_tab, text="Output / Results (also check console):")
+        results_label.pack(padx=10, pady=(5,0), anchor=tk.W)
+        
+        self.db_utils_result_text = Text(self.db_utils_tab, height=15, width=90, wrap="word")
+        db_scroll = ttk.Scrollbar(self.db_utils_tab, command=self.db_utils_result_text.yview)
+        self.db_utils_result_text.configure(yscrollcommand=db_scroll.set)
+        
+        db_scroll.pack(side=tk.RIGHT, fill=tk.Y, padx=(0,10), pady=(0,10))
+        self.db_utils_result_text.pack(fill=tk.BOTH, expand=True, padx=(10,0), pady=(0,10))
+
+    # --- NEW methods for loading combobox data ---
+    def load_university_combo_data(self):
+        self.status_var.set("Loading university list...")
+        self._append_db_util_result("Fetching unique universities from bank_acc_db.db...")
+        # Pass the BANK_ACC_DB_PATH_FOR_VERIFICATION from utils.database_handler
+        # This path is already defined and imported.
+        uni_list = relational_db_operations.get_unique_universities_from_bank_acc_db(
+            BANK_ACC_DB_PATH_FOR_VERIFICATION, # Use the path defined in utils.database_handler
+            text_widget_update=self._append_db_util_result
+        )
+        if uni_list:
+            self.db_uni_name_combo['values'] = uni_list
+            self.db_uni_name_combo.set(uni_list[0]) # Select first item
+            self.db_uni_name_combo.config(state="readonly")
+            self._append_db_util_result(f"Loaded {len(uni_list)} universities into dropdown.")
+        else:
+            self.db_uni_name_combo['values'] = []
+            self.db_uni_name_combo.set('')
+            self.db_uni_name_combo.config(state="disabled")
+            self._append_db_util_result("No universities found or error loading list for dropdown.")
+        self.status_var.set("University list loaded.")
+
+    def load_case_number_combo_data(self):
+        self.status_var.set("Loading case number list...")
+        self._append_db_util_result(f"Fetching unique case numbers from {os.path.basename(relational_db_operations.CASE_LIST_DB_PATH)}...")
+        case_list = relational_db_operations.get_unique_case_numbers_from_case_list_db(
+            relational_db_operations.CASE_LIST_DB_PATH, 
+            text_widget_update=self._append_db_util_result
+        )
+        if case_list:
+            self.db_case_num_combo['values'] = case_list
+            self.db_case_num_combo.set(case_list[0]) # Select first item
+            self.db_case_num_combo.config(state="readonly")
+            self._append_db_util_result(f"Loaded {len(case_list)} case numbers into dropdown.")
+        else:
+            self.db_case_num_combo['values'] = []
+            self.db_case_num_combo.set('')
+            self.db_case_num_combo.config(state="disabled")
+            self._append_db_util_result("No case numbers found or error loading list for dropdown.")
+        self.status_var.set("Case number list loaded.")
+   
 
     def browse_directory(self, entry_widget):
         directory = filedialog.askdirectory()
@@ -546,6 +632,124 @@ class ExcelProcessorApp:
         except Exception as e:
             messagebox.showerror("Error", f"Database error: {str(e)}")
             self.status_var.set("Error adding data to database")
+
+    # --- Methods for the Database Utilities Tab (some modified, some new) ---
+    def _append_db_util_result(self, message): # Helper
+        self.db_utils_result_text.insert(tk.END, str(message) + "\n")
+        self.db_utils_result_text.see(tk.END) 
+
+    def run_verify_bank_accounts(self): # No change in logic, just uses the central handler
+        self.db_utils_result_text.delete(1.0, tk.END)
+        self._append_db_util_result("Attempting to verify bank accounts...")
+        self.status_var.set("Verifying bank accounts...")
+        self.db_handler.verify_bank_accounts_in_combined_db() 
+        self._append_db_util_result("Bank account verification process finished. Check status bar and pop-up messages.")
+
+    def run_setup_project_schema(self): # No change in logic
+        self.db_utils_result_text.delete(1.0, tk.END)
+        self._append_db_util_result(f"Attempting to set up/verify schema in '{relational_db_operations.PROJECT_DB_PATH}'...")
+        self.status_var.set("Setting up project schema...")
+        try:
+            relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
+            msg = f"Schema operation completed for {os.path.basename(relational_db_operations.PROJECT_DB_PATH)}."
+            self._append_db_util_result(msg)
+            messagebox.showinfo("Schema Setup", msg)
+            self.status_var.set("Project schema setup complete.")
+        except Exception as e:
+            err_msg = f"Error during schema setup: {e}"
+            self._append_db_util_result(err_msg)
+            messagebox.showerror("Schema Error", err_msg)
+            self.status_var.set("Error in schema setup.")
+
+    # NEW method to call the new population function
+    def run_populate_project_data_from_combined_db(self):
+        self.db_utils_result_text.delete(1.0, tk.END)
+        self._append_db_util_result(f"Attempting to populate '{relational_db_operations.PROJECT_DB_PATH}' from '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}'...")
+        self.status_var.set("Populating project DB from Combined.db...")
+        try:
+            # Ensure schema exists first
+            if not os.path.exists(relational_db_operations.PROJECT_DB_PATH):
+                 self._append_db_util_result(f"Database {relational_db_operations.PROJECT_DB_PATH} not found. Running schema setup first.")
+                 relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
+                 self._append_db_util_result("Schema setup complete.")
+            
+            # Pass the COMBINED_DB_PATH_FOR_VERIFICATION from utils.database_handler
+            count = relational_db_operations.populate_project_data_from_combined_db(
+                relational_db_operations.PROJECT_DB_PATH,
+                COMBINED_DB_PATH_FOR_VERIFICATION, # Use the path defined in utils.database_handler
+                text_widget_update=self._append_db_util_result
+            )
+            msg = f"Population from Combined.db complete. Processed/updated {count} main entries."
+            self._append_db_util_result(msg) # Already printed by the function, but good summary
+            messagebox.showinfo("Data Population", msg)
+            self.status_var.set("Population from Combined.db complete.")
+        except Exception as e:
+            err_msg = f"Error during data population: {e}"
+            self._append_db_util_result(err_msg)
+            messagebox.showerror("Population Error", err_msg)
+            self.status_var.set("Error in data population.")
+
+
+    def run_display_users_with_bank_accounts(self): # No change in logic
+        self.db_utils_result_text.delete(1.0, tk.END)
+        self._append_db_util_result(f"Fetching users with bank accounts from '{relational_db_operations.PROJECT_DB_PATH}'...")
+        self.status_var.set("Fetching users with accounts...")
+        try:
+            df = relational_db_operations.display_users_with_bank_accounts(relational_db_operations.PROJECT_DB_PATH, text_widget_update=self._append_db_util_result)
+            # Output handling is now inside display_users_with_bank_accounts if text_widget_update is passed
+            # or you can add more specific GUI updates here based on df
+            if df is not None and not df.empty:
+                 self._append_db_util_result("\n--- Users with Bank Accounts (via Cases) ---") # Example of adding more context
+                 self._append_db_util_result(df.to_string())
+            elif df is not None and df.empty :
+                 self._append_db_util_result("No users found with bank accounts linked to their cases.")
+            self.status_var.set("Displayed users with accounts.")
+        except Exception as e:
+            self._append_db_util_result(f"Error displaying users: {e}")
+            self.status_var.set("Error displaying users.")
+
+
+    def run_display_cases_for_university(self): # MODIFIED to get uni_name from Combobox
+        self.db_utils_result_text.delete(1.0, tk.END)
+        uni_name = self.db_uni_name_combo.get() # Get from Combobox
+        if not uni_name:
+            messagebox.showerror("Input Error", "Please select a University Name from the dropdown.")
+            self.status_var.set("University not selected.")
+            return
+        self._append_db_util_result(f"Fetching cases for university '{uni_name}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
+        self.status_var.set(f"Fetching cases for {uni_name}...")
+        try:
+            df = relational_db_operations.display_all_cases_for_university(relational_db_operations.PROJECT_DB_PATH, uni_name, text_widget_update=self._append_db_util_result)
+            if df is not None and not df.empty:
+                self._append_db_util_result(f"\n--- Cases for University: {uni_name} ---")
+                self._append_db_util_result(df.to_string())
+            elif df is not None and df.empty:
+                self._append_db_util_result(f"No cases found for university: '{uni_name}'")
+            self.status_var.set(f"Displayed cases for {uni_name}.")
+        except Exception as e:
+            self._append_db_util_result(f"Error displaying cases: {e}")
+            self.status_var.set("Error displaying cases.")
+
+    def run_display_university_for_case(self): # MODIFIED to get case_num from Combobox
+        self.db_utils_result_text.delete(1.0, tk.END)
+        case_num = self.db_case_num_combo.get() # Get from Combobox
+        if not case_num:
+            messagebox.showerror("Input Error", "Please select a Case Number from the dropdown.")
+            self.status_var.set("Case number not selected.")
+            return
+        self._append_db_util_result(f"Fetching university for case '{case_num}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
+        self.status_var.set(f"Fetching university for {case_num}...")
+        try:
+            df = relational_db_operations.display_university_for_case(relational_db_operations.PROJECT_DB_PATH, case_num, text_widget_update=self._append_db_util_result)
+            if df is not None and not df.empty:
+                self._append_db_util_result(f"\n--- University for Case Number: {case_num} ---")
+                self._append_db_util_result(df.to_string())
+            elif df is not None and df.empty:
+                 self._append_db_util_result(f"No university found for case number: '{case_num}' (or case does not exist).")
+            self.status_var.set(f"Displayed university for {case_num}.")
+        except Exception as e:
+            self._append_db_util_result(f"Error displaying university: {e}")
+            self.status_var.set("Error displaying university.")
 
 
 if __name__ == "__main__":
