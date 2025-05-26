@@ -4,7 +4,7 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 import threading
 import sqlite3
-from rozklasowany.modules.excel_data_scraper import ExcelDataScraper
+from modules.excel_data_scraper import ExcelDataScraper
 from modules.excel_transposer import ExcelTransposer
 from modules.outlook_processor import OutlookProcessor
 from modules.case_list import CaseList
