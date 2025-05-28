@@ -1,723 +1,556 @@
-import tkinter as tk
-from tkinter import *
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QFormLayout,
+                             QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QTextEdit,
+                             QFileDialog, QMessageBox, QComboBox, QGroupBox)
+from PyQt6.QtCore import QTimer
 import threading
+import sys
 import os
 from modules.excel_data_scraper import ExcelDataScraper
-from modules.excel_transposer import ExcelTransposer
 from modules.outlook_processor import OutlookProcessor
 from modules.case_list import CaseList
-from utils.database_handler import DatabaseHandler
 from utils.database_handler import DatabaseHandler, COMBINED_DB_PATH_FOR_VERIFICATION, BANK_ACC_DB_PATH_FOR_VERIFICATION
-from modules import relational_db_operations # New module for relational DB functions
+from modules import relational_db_operations
 
+class ExcelProcessorApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Excel Processor Tool")
+        self.setGeometry(100, 100, 850, 700)
 
-class ExcelProcessorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Excel Processor Tool")
-        self.root.geometry("850x700") # Increased size for new tab content
+        # Status Bar
+        self.status_bar = self.statusBar()
+        self.status_bar.showMessage("Ready")
 
-        # --- Centralized Status Variable ---
-        self.status_var = tk.StringVar()
-        self.status_var.set("Ready")
-
-        # --- Initialize Components ---
+        # Initialize Components
         self.excel_scraper = ExcelDataScraper()
-        # Initialize DatabaseHandler instance to be used across tabs
-        self.db_handler = DatabaseHandler(status_var=self.status_var)
-        
-        # --- Notebook with Tabs ---
-        self.notebook = ttk.Notebook(root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # --- Create Frames for each Tab ---
-        self.outlook_tab = ttk.Frame(self.notebook)
-        self.case_list_tab = ttk.Frame(self.notebook)
-        # self.transpose_tab = ttk.Frame(self.notebook) # Was commented out
-        self.scrape_tab = ttk.Frame(self.notebook)
-        self.db_utils_tab = ttk.Frame(self.notebook) # New tab
+        self.db_handler = DatabaseHandler(status_var=None)  # Status handled via status_bar
 
-        self.notebook.add(self.outlook_tab, text="Outlook Processor")
-        self.notebook.add(self.case_list_tab, text="Case List")
-        self.notebook.add(self.scrape_tab, text="Excel Scraper")
-        self.notebook.add(self.db_utils_tab, text="Database Utilities") # Add new tab
-        
-        # --- Setup Tabs ---
+        # Tab Widget
+        self.tab_widget = QTabWidget()
+        self.setCentralWidget(self.tab_widget)
+
+        # Create Tabs
+        self.outlook_tab = QWidget()
+        self.case_list_tab = QWidget()
+        self.scrape_tab = QWidget()
+        self.db_utils_tab = QWidget()
+
+        self.tab_widget.addTab(self.outlook_tab, "Outlook Processor")
+        self.tab_widget.addTab(self.case_list_tab, "Case List")
+        self.tab_widget.addTab(self.scrape_tab, "Excel Scraper")
+        self.tab_widget.addTab(self.db_utils_tab, "Database Utilities")
+
+        # Setup Tabs
         self.setup_outlook_tab()
         self.setup_case_list_tab()
-        # self.setup_transpose_tab() # Was commented out
         self.setup_scrape_tab()
-        self.setup_db_utils_tab() # Setup new tab
-        
-        # --- Status Bar at the Bottom ---
-        status_frame = ttk.Frame(root)
-        status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
-        ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
+        self.setup_db_utils_tab()
 
-    def export_to_excel(self):
-        try:
-            if not self.excel_scraper.get_results():
-                messagebox.showerror("Error", "No data to export. Please scrape Excel files first.")
-                return
-                
-            output_file = filedialog.asksaveasfilename(
-                defaultextension=".xlsx",
-                filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")]
-            )
-            
-            if not output_file:
-                return  # User cancelled
-                
-            success = self.excel_scraper.save_results_to_excel(output_file)
-            
-            if success:
-                messagebox.showinfo("Success", f"Data exported to {output_file}")
-                self.status_var.set("Data exported to Excel")
-            else:
-                messagebox.showerror("Error", "Failed to export data")
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Export error: {str(e)}")
-            self.status_var.set("Error exporting data")
+    ### Tab Setup Methods ###
 
     def setup_outlook_tab(self):
-        # Create form for Outlook processor
-        ttk.Label(self.outlook_tab, text="Email Category:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-        self.category_entry = ttk.Entry(self.outlook_tab, width=40)
-        self.category_entry.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-        self.category_entry.insert(0, "Approval")
-        
-        ttk.Label(self.outlook_tab, text="Target Senders (comma-separated):").grid(row=1, column=0, sticky=W, padx=10, pady=5)
-        self.senders_entry = ttk.Entry(self.outlook_tab, width=40)
-        self.senders_entry.grid(row=1, column=1, sticky=W, padx=10, pady=5)
-        self.senders_entry.insert(0, "Sender1,Sender2")
-        
-        ttk.Label(self.outlook_tab, text="Attachments Save Path:").grid(row=2, column=0, sticky=W, padx=10, pady=5)
-        self.attachment_path_frame = ttk.Frame(self.outlook_tab)
-        self.attachment_path_frame.grid(row=2, column=1, sticky=W, padx=10, pady=5)
-        self.attachment_path_entry = ttk.Entry(self.attachment_path_frame, width=30)
-        self.attachment_path_entry.pack(side=tk.LEFT)
-        self.attachment_path_entry.insert(0, "C:/Attachments")
-        ttk.Button(self.attachment_path_frame, text="Browse", command=lambda: self.browse_directory(self.attachment_path_entry)).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(self.outlook_tab, text="Messages Save Path:").grid(row=3, column=0, sticky=W, padx=10, pady=5)
-        self.msg_path_frame = ttk.Frame(self.outlook_tab)
-        self.msg_path_frame.grid(row=3, column=1, sticky=W, padx=10, pady=5)
-        self.msg_path_entry = ttk.Entry(self.msg_path_frame, width=30)
-        self.msg_path_entry.pack(side=tk.LEFT)
-        self.msg_path_entry.insert(0, "C:/Messages")
-        ttk.Button(self.msg_path_frame, text="Browse", command=lambda: self.browse_directory(self.msg_path_entry)).pack(side=tk.LEFT, padx=5)
-        
-        self.mark_as_read_var = BooleanVar(value=True)
-        ttk.Checkbutton(self.outlook_tab, text="Mark emails as read", variable=self.mark_as_read_var).grid(row=4, column=0, sticky=W, padx=10, pady=5)
-        
-        self.save_emails_var = BooleanVar(value=True)
-        ttk.Checkbutton(self.outlook_tab, text="Save emails", variable=self.save_emails_var).grid(row=4, column=1, sticky=W, padx=10, pady=5)
-        
-        ttk.Button(self.outlook_tab, text="Check Unread Emails", command=self.check_unread_emails).grid(row=5, column=0, sticky=W, padx=10, pady=5)
-        ttk.Button(self.outlook_tab, text="Process Emails", command=self.process_emails).grid(row=5, column=1, sticky=W, padx=10, pady=5)
-        
-        # Results display
-        ttk.Label(self.outlook_tab, text="Processing Results:").grid(row=6, column=0, sticky=W, padx=10, pady=5)
-        self.outlook_result_text = Text(self.outlook_tab, height=15, width=80)
-        self.outlook_result_text.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
-        
-        # Add scrollbar
-        outlook_scrollbar = ttk.Scrollbar(self.outlook_tab, command=self.outlook_result_text.yview)
-        outlook_scrollbar.grid(row=7, column=2, sticky='nsew')
-        self.outlook_result_text.config(yscrollcommand=outlook_scrollbar.set)
+        layout = QVBoxLayout()
 
+        # Form Layout for Inputs
+        form_layout = QFormLayout()
+
+        # Email Category
+        self.category_entry = QLineEdit()
+        self.category_entry.setText("Approval")
+        form_layout.addRow("Email Category:", self.category_entry)
+
+        # Target Senders
+        self.senders_entry = QLineEdit()
+        self.senders_entry.setText("Sender1,Sender2")
+        form_layout.addRow("Target Senders (comma-separated):", self.senders_entry)
+
+        # Attachments Save Path
+        self.attachment_path_entry = QLineEdit()
+        self.attachment_path_entry.setText("C:/Attachments")
+        attachment_path_button = QPushButton("Browse")
+        attachment_path_button.clicked.connect(lambda: self.browse_directory(self.attachment_path_entry))
+        attachment_layout = QHBoxLayout()
+        attachment_layout.addWidget(self.attachment_path_entry)
+        attachment_layout.addWidget(attachment_path_button)
+        form_layout.addRow("Attachments Save Path:", attachment_layout)
+
+        # Messages Save Path
+        self.msg_path_entry = QLineEdit()
+        self.msg_path_entry.setText("C:/Messages")
+        msg_path_button = QPushButton("Browse")
+        msg_path_button.clicked.connect(lambda: self.browse_directory(self.msg_path_entry))
+        msg_layout = QHBoxLayout()
+        msg_layout.addWidget(self.msg_path_entry)
+        msg_layout.addWidget(msg_path_button)
+        form_layout.addRow("Messages Save Path:", msg_layout)
+
+        # Checkboxes
+        self.mark_as_read_check = QCheckBox("Mark emails as read")
+        self.mark_as_read_check.setChecked(True)
+        form_layout.addRow(self.mark_as_read_check)
+
+        self.save_emails_check = QCheckBox("Save emails")
+        self.save_emails_check.setChecked(True)
+        form_layout.addRow(self.save_emails_check)
+
+        layout.addLayout(form_layout)
+
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        check_unread_button = QPushButton("Check Unread Emails")
+        check_unread_button.clicked.connect(self.check_unread_emails)
+        process_emails_button = QPushButton("Process Emails")
+        process_emails_button.clicked.connect(self.process_emails)
+        buttons_layout.addWidget(check_unread_button)
+        buttons_layout.addWidget(process_emails_button)
+        layout.addLayout(buttons_layout)
+
+        # Results Display
+        layout.addWidget(QLabel("Processing Results:"))
+        self.outlook_result_text = QTextEdit()
+        self.outlook_result_text.setReadOnly(True)
+        layout.addWidget(self.outlook_result_text)
+
+        self.outlook_tab.setLayout(layout)
 
     def setup_case_list_tab(self):
-        ttk.Label(self.case_list_tab, text="Excel Files Folder:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-        self.excel_folder_frame = ttk.Frame(self.case_list_tab)
-        self.excel_folder_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-        self.excel_folder_entry = ttk.Entry(self.excel_folder_frame, width=30)
-        self.excel_folder_entry.pack(side=tk.LEFT)
-        ttk.Button(self.excel_folder_frame, text="Browse", command=lambda: self.browse_directory(self.excel_folder_entry)).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(self.case_list_tab, text="List Output Folder:").grid(row=1, column=0, sticky=W, padx=10, pady=5)
-        self.list_folder_frame = ttk.Frame(self.case_list_tab)
-        self.list_folder_frame.grid(row=1, column=1, sticky=W, padx=10, pady=5)
-        self.list_folder_entry = ttk.Entry(self.list_folder_frame, width=30)
-        self.list_folder_entry.pack(side=tk.LEFT)
-        ttk.Button(self.list_folder_frame, text="Browse", command=lambda: self.browse_directory(self.list_folder_entry)).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(self.case_list_tab, text="Process Case List", command=self.process_case_list).grid(row=2, column=0, columnspan=2, padx=10, pady=10)
-        
-        # Results display
-        ttk.Label(self.case_list_tab, text="Processing Results:").grid(row=3, column=0, sticky=W, padx=10, pady=5)
-        self.case_list_result_text = Text(self.case_list_tab, height=15, width=80)
-        self.case_list_result_text.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
-        
-        # Add scrollbar
-        case_list_scrollbar = ttk.Scrollbar(self.case_list_tab, command=self.case_list_result_text.yview)
-        case_list_scrollbar.grid(row=4, column=2, sticky='nsew')
-        self.case_list_result_text.config(yscrollcommand=case_list_scrollbar.set)
+        layout = QVBoxLayout()
 
-    def setup_transpose_tab(self):
-        ttk.Label(self.transpose_tab, text="Excel File:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-        self.excel_file_frame = ttk.Frame(self.transpose_tab)
-        self.excel_file_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-        self.excel_file_entry = ttk.Entry(self.excel_file_frame, width=30)
-        self.excel_file_entry.pack(side=tk.LEFT)
-        ttk.Button(self.excel_file_frame, text="Browse", command=lambda: self.browse_file(self.excel_file_entry, [("Excel Files", "*.xlsx")])).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(self.transpose_tab, text="Sheet Name (optional):").grid(row=1, column=0, sticky=W, padx=10, pady=5)
-        self.sheet_name_entry = ttk.Entry(self.transpose_tab, width=30)
-        self.sheet_name_entry.grid(row=1, column=1, sticky=W, padx=10, pady=5)
-        
-        ttk.Button(self.transpose_tab, text="Transpose Excel", command=self.transpose_excel).grid(row=2, column=0, columnspan=2, padx=10, pady=10)
-        
-        # Results display
-        ttk.Label(self.transpose_tab, text="Transpose Results:").grid(row=3, column=0, sticky=W, padx=10, pady=5)
-        self.transpose_result_text = Text(self.transpose_tab, height=15, width=80)
-        self.transpose_result_text.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
-    
+        # Form Layout for Inputs
+        form_layout = QFormLayout()
+
+        # Excel Files Folder
+        self.excel_folder_entry = QLineEdit()
+        excel_folder_button = QPushButton("Browse")
+        excel_folder_button.clicked.connect(lambda: self.browse_directory(self.excel_folder_entry))
+        excel_folder_layout = QHBoxLayout()
+        excel_folder_layout.addWidget(self.excel_folder_entry)
+        excel_folder_layout.addWidget(excel_folder_button)
+        form_layout.addRow("Excel Files Folder:", excel_folder_layout)
+
+        # List Output Folder
+        self.list_folder_entry = QLineEdit()
+        list_folder_button = QPushButton("Browse")
+        list_folder_button.clicked.connect(lambda: self.browse_directory(self.list_folder_entry))
+        list_folder_layout = QHBoxLayout()
+        list_folder_layout.addWidget(self.list_folder_entry)
+        list_folder_layout.addWidget(list_folder_button)
+        form_layout.addRow("List Output Folder:", list_folder_layout)
+
+        layout.addLayout(form_layout)
+
+        # Button
+        process_case_list_button = QPushButton("Process Case List")
+        process_case_list_button.clicked.connect(self.process_case_list)
+        layout.addWidget(process_case_list_button)
+
+        # Results Display
+        layout.addWidget(QLabel("Processing Results:"))
+        self.case_list_result_text = QTextEdit()
+        self.case_list_result_text.setReadOnly(True)
+        layout.addWidget(self.case_list_result_text)
+
+        self.case_list_tab.setLayout(layout)
+
     def setup_scrape_tab(self):
-        ttk.Label(self.scrape_tab, text="Excel Files Directory:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-        self.scrape_dir_frame = ttk.Frame(self.scrape_tab)
-        self.scrape_dir_frame.grid(row=0, column=1, sticky=W, padx=10, pady=5)
-        self.scrape_dir_entry = ttk.Entry(self.scrape_dir_frame, width=30)
-        self.scrape_dir_entry.pack(side=tk.LEFT)
-        ttk.Button(self.scrape_dir_frame, text="Browse", command=lambda: self.browse_directory(self.scrape_dir_entry)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(self.scrape_dir_frame, text="Scrape Excel Files", command=self.scrape_excel_files).pack(side=tk.LEFT, padx=5)
-        
-        range_frame = ttk.Frame(self.scrape_tab)
-        range_frame.grid(row=1, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-        
-        ttk.Label(range_frame, text="Cell Range:").pack(side=tk.LEFT, padx=5)
-        ttk.Label(range_frame, text="From:").pack(side=tk.LEFT, padx=5)
-        self.range_start_entry = ttk.Entry(range_frame, width=8)
-        self.range_start_entry.pack(side=tk.LEFT, padx=5)
-        self.range_start_entry.insert(0, "A2")
-        ttk.Label(range_frame, text="To:").pack(side=tk.LEFT, padx=5)
-        self.range_end_entry = ttk.Entry(range_frame, width=8)
-        self.range_end_entry.pack(side=tk.LEFT, padx=5)
-        self.range_end_entry.insert(0, "G2")
-        
-        self.read_headers_var = BooleanVar(value=True)
-        ttk.Checkbutton(self.scrape_tab, text="Read headers from first row", variable=self.read_headers_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=10, pady=5)
-        
-        buttons_frame = ttk.Frame(self.scrape_tab)
-        buttons_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
-        
-        ttk.Button(buttons_frame, text="Export to Excel", command=self.export_to_excel).pack(side=tk.LEFT, padx=5)
-        ttk.Button(buttons_frame, text="Export to CSV", command=self.export_to_csv).pack(side=tk.LEFT, padx=5)
-        
-        # Modified "Add to Database" button to use the central db_handler instance
-        # This button will call DatabaseHandler's add_to_database, which prompts for .txt and .xlsx files
-        ttk.Button(buttons_frame, text="Files to DB (.txt/.xlsx)", command=self.db_handler.add_to_database).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(self.scrape_tab, text="Scraped Data:").grid(row=4, column=0, sticky=W, padx=10, pady=5)
-        results_frame = ttk.Frame(self.scrape_tab)
-        results_frame.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky='nsew')
-        
-        self.scrape_tab.rowconfigure(5, weight=1)
-        self.scrape_tab.columnconfigure(1, weight=1) # column 0 and 1 are used, so columnspan 2
-        
-        self.scrape_result_text = Text(results_frame, height=15, width=80)
-        v_scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.scrape_result_text.yview)
-        h_scrollbar = ttk.Scrollbar(results_frame, orient="horizontal", command=self.scrape_result_text.xview)
-        self.scrape_result_text.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set, wrap="none")
-        
-        self.scrape_result_text.grid(row=0, column=0, sticky='nsew')
-        v_scrollbar.grid(row=0, column=1, sticky='ns')
-        h_scrollbar.grid(row=1, column=0, sticky='ew')
-        
-        results_frame.rowconfigure(0, weight=1)
-        results_frame.columnconfigure(0, weight=1)
+        layout = QVBoxLayout()
 
-    def setup_db_utils_tab(self): # MODIFIED
-        # --- Section for Bank Account Verification ---
-        verify_frame = ttk.LabelFrame(self.db_utils_tab, text="Bank Account Verification")
-        verify_frame.pack(fill=tk.X, padx=10, pady=10)
+        # Excel Files Directory
+        self.scrape_dir_entry = QLineEdit()
+        scrape_dir_button = QPushButton("Browse")
+        scrape_dir_button.clicked.connect(lambda: self.browse_directory(self.scrape_dir_entry))
+        scrape_dir_layout = QHBoxLayout()
+        scrape_dir_layout.addWidget(self.scrape_dir_entry)
+        scrape_dir_layout.addWidget(scrape_dir_button)
+        layout.addWidget(QLabel("Excel Files Directory:"))
+        layout.addLayout(scrape_dir_layout)
 
-        # Using os.path.abspath to show full paths in GUI for clarity
+        # Range Selection
+        range_layout = QHBoxLayout()
+        range_layout.addWidget(QLabel("Cell Range:"))
+        range_layout.addWidget(QLabel("From:"))
+        self.range_start_entry = QLineEdit()
+        self.range_start_entry.setText("A2")
+        range_layout.addWidget(self.range_start_entry)
+        range_layout.addWidget(QLabel("To:"))
+        self.range_end_entry = QLineEdit()
+        self.range_end_entry.setText("G2")
+        range_layout.addWidget(self.range_end_entry)
+        layout.addLayout(range_layout)
+
+        # Read Headers Checkbox
+        self.read_headers_check = QCheckBox("Read headers from first row")
+        self.read_headers_check.setChecked(True)
+        layout.addWidget(self.read_headers_check)
+
+        # Buttons
+        buttons_layout = QHBoxLayout()
+        scrape_button = QPushButton("Scrape Excel Files")
+        scrape_button.clicked.connect(self.scrape_excel_files)
+        export_excel_button = QPushButton("Export to Excel")
+        export_excel_button.clicked.connect(self.export_to_excel)
+        export_csv_button = QPushButton("Export to CSV")
+        export_csv_button.clicked.connect(self.export_to_csv)
+        files_to_db_button = QPushButton("Files to DB (.txt/.xlsx)")
+        files_to_db_button.clicked.connect(self.add_to_database)
+        buttons_layout.addWidget(scrape_button)
+        buttons_layout.addWidget(export_excel_button)
+        buttons_layout.addWidget(export_csv_button)
+        buttons_layout.addWidget(files_to_db_button)
+        layout.addLayout(buttons_layout)
+
+        # Results Display
+        layout.addWidget(QLabel("Scraped Data:"))
+        self.scrape_result_text = QTextEdit()
+        self.scrape_result_text.setReadOnly(True)
+        layout.addWidget(self.scrape_result_text)
+
+        self.scrape_tab.setLayout(layout)
+
+    def setup_db_utils_tab(self):
+        layout = QVBoxLayout()
+
+        # Bank Account Verification Section
+        verify_group = QGroupBox("Bank Account Verification")
+        verify_layout = QVBoxLayout()
         verify_desc = (f"Checks bank accounts from:\n'{os.path.abspath(COMBINED_DB_PATH_FOR_VERIFICATION)}'\n"
                        f"against:\n'{os.path.abspath(BANK_ACC_DB_PATH_FOR_VERIFICATION)}'.\n"
                        f"Ensure files exist and are formatted (table 'data', columns 'university', 'bank account').")
-        ttk.Label(verify_frame, text=verify_desc, wraplength=780, justify=tk.LEFT).pack(padx=5, pady=5)
-        ttk.Button(verify_frame, text="Verify Bank Accounts", command=self.run_verify_bank_accounts).pack(pady=5)
+        verify_label = QLabel(verify_desc)
+        verify_label.setWordWrap(True)
+        verify_layout.addWidget(verify_label)
+        verify_button = QPushButton("Verify Bank Accounts")
+        verify_button.clicked.connect(self.run_verify_bank_accounts)
+        verify_layout.addWidget(verify_button)
+        verify_group.setLayout(verify_layout)
+        layout.addWidget(verify_group)
 
-        # --- Section for Relational Database Project ---
-        project_db_frame = ttk.LabelFrame(self.db_utils_tab, text=f"Relational Project Database ({os.path.basename(relational_db_operations.PROJECT_DB_PATH)})")
-        project_db_frame.pack(fill=tk.X, padx=10, pady=10)
+        # Relational Database Project Section
+        project_group = QGroupBox(f"Relational Project Database ({os.path.basename(relational_db_operations.PROJECT_DB_PATH)})")
+        project_layout = QVBoxLayout()
 
-        setup_frame = ttk.Frame(project_db_frame)
-        setup_frame.pack(fill=tk.X, pady=5)
-        ttk.Button(setup_frame, text="Setup/Verify Project Schema", command=self.run_setup_project_schema).pack(side=tk.LEFT, padx=5)
-        # MODIFIED Button: from "Add Sample Project Data" to "Populate from Combined.db"
-        ttk.Button(setup_frame, text="Populate DB from Combined.db", command=self.run_populate_project_data_from_combined_db).pack(side=tk.LEFT, padx=5)
-        
-        query_frame = ttk.Frame(project_db_frame)
-        query_frame.pack(fill=tk.X, pady=10)
+        # Setup Buttons
+        setup_layout = QHBoxLayout()
+        setup_schema_button = QPushButton("Setup/Verify Project Schema")
+        setup_schema_button.clicked.connect(self.run_setup_project_schema)
+        populate_db_button = QPushButton("Populate DB from Combined.db")
+        populate_db_button.clicked.connect(self.run_populate_project_data_from_combined_db)
+        setup_layout.addWidget(setup_schema_button)
+        setup_layout.addWidget(populate_db_button)
+        project_layout.addLayout(setup_layout)
 
-        ttk.Label(query_frame, text="University Name:").grid(row=0, column=0, padx=5, pady=2, sticky=tk.W)
-        # MODIFIED: Entry to Combobox for University
-        self.db_uni_name_combo = ttk.Combobox(query_frame, width=38, state="readonly") # state readonly after populating
-        self.db_uni_name_combo.grid(row=0, column=1, padx=5, pady=2, sticky=tk.W)
-        ttk.Button(query_frame, text="Refresh Uni List", command=self.load_university_combo_data).grid(row=0, column=2, padx=2, pady=2) # Refresh button
-        ttk.Button(query_frame, text="Show Cases for University", command=self.run_display_cases_for_university).grid(row=0, column=3, padx=5, pady=2)
+        # Query Section
+        query_layout = QFormLayout()
+        self.db_uni_name_combo = QComboBox()
+        self.db_uni_name_combo.setEditable(False)
+        query_layout.addRow("University Name:", self.db_uni_name_combo)
+        refresh_uni_button = QPushButton("Refresh Uni List")
+        refresh_uni_button.clicked.connect(self.load_university_combo_data)
+        query_layout.addRow("", refresh_uni_button)
+        show_cases_button = QPushButton("Show Cases for University")
+        show_cases_button.clicked.connect(self.run_display_cases_for_university)
+        query_layout.addRow("", show_cases_button)
 
+        self.db_case_num_combo = QComboBox()
+        self.db_case_num_combo.setEditable(False)
+        query_layout.addRow("Case Number:", self.db_case_num_combo)
+        refresh_case_button = QPushButton("Refresh Case List")
+        refresh_case_button.clicked.connect(self.load_case_number_combo_data)
+        query_layout.addRow("", refresh_case_button)
+        show_uni_button = QPushButton("Show University for Case")
+        show_uni_button.clicked.connect(self.run_display_university_for_case)
+        query_layout.addRow("", show_uni_button)
 
-        ttk.Label(query_frame, text="Case Number:").grid(row=1, column=0, padx=5, pady=2, sticky=tk.W)
-        # MODIFIED: Entry to Combobox for Case Number
-        self.db_case_num_combo = ttk.Combobox(query_frame, width=38, state="readonly")
-        self.db_case_num_combo.grid(row=1, column=1, padx=5, pady=2, sticky=tk.W)
-        ttk.Button(query_frame, text="Refresh Case List", command=self.load_case_number_combo_data).grid(row=1, column=2, padx=2, pady=2) # Refresh button
-        ttk.Button(query_frame, text="Show University for Case", command=self.run_display_university_for_case).grid(row=1, column=3, padx=5, pady=2)
-        
-        ttk.Button(query_frame, text="Show Users with Bank Accounts (All)", command=self.run_display_users_with_bank_accounts).grid(row=2, column=0, columnspan=4, pady=10)
+        show_users_button = QPushButton("Show Users with Bank Accounts (All)")
+        show_users_button.clicked.connect(self.run_display_users_with_bank_accounts)
+        query_layout.addRow(show_users_button)
 
-        results_label = ttk.Label(self.db_utils_tab, text="Output / Results (also check console):")
-        results_label.pack(padx=10, pady=(5,0), anchor=tk.W)
-        
-        self.db_utils_result_text = Text(self.db_utils_tab, height=15, width=90, wrap="word")
-        db_scroll = ttk.Scrollbar(self.db_utils_tab, command=self.db_utils_result_text.yview)
-        self.db_utils_result_text.configure(yscrollcommand=db_scroll.set)
-        
-        db_scroll.pack(side=tk.RIGHT, fill=tk.Y, padx=(0,10), pady=(0,10))
-        self.db_utils_result_text.pack(fill=tk.BOTH, expand=True, padx=(10,0), pady=(0,10))
+        project_layout.addLayout(query_layout)
+        project_group.setLayout(project_layout)
+        layout.addWidget(project_group)
 
-    # --- NEW methods for loading combobox data ---
-    def load_university_combo_data(self):
-        self.status_var.set("Loading university list...")
-        self._append_db_util_result("Fetching unique universities from bank_acc_db.db...")
-        # Pass the BANK_ACC_DB_PATH_FOR_VERIFICATION from utils.database_handler
-        # This path is already defined and imported.
-        uni_list = relational_db_operations.get_unique_universities_from_bank_acc_db(
-            BANK_ACC_DB_PATH_FOR_VERIFICATION, # Use the path defined in utils.database_handler
-            text_widget_update=self._append_db_util_result
-        )
-        if uni_list:
-            self.db_uni_name_combo['values'] = uni_list
-            self.db_uni_name_combo.set(uni_list[0]) # Select first item
-            self.db_uni_name_combo.config(state="readonly")
-            self._append_db_util_result(f"Loaded {len(uni_list)} universities into dropdown.")
-        else:
-            self.db_uni_name_combo['values'] = []
-            self.db_uni_name_combo.set('')
-            self.db_uni_name_combo.config(state="disabled")
-            self._append_db_util_result("No universities found or error loading list for dropdown.")
-        self.status_var.set("University list loaded.")
+        # Results Display
+        layout.addWidget(QLabel("Output / Results (also check console):"))
+        self.db_utils_result_text = QTextEdit()
+        self.db_utils_result_text.setReadOnly(True)
+        layout.addWidget(self.db_utils_result_text)
 
-    def load_case_number_combo_data(self):
-        self.status_var.set("Loading case number list...")
-        self._append_db_util_result(f"Fetching unique case numbers from {os.path.basename(relational_db_operations.CASE_LIST_DB_PATH)}...")
-        case_list = relational_db_operations.get_unique_case_numbers_from_case_list_db(
-            relational_db_operations.CASE_LIST_DB_PATH, 
-            text_widget_update=self._append_db_util_result
-        )
-        if case_list:
-            self.db_case_num_combo['values'] = case_list
-            self.db_case_num_combo.set(case_list[0]) # Select first item
-            self.db_case_num_combo.config(state="readonly")
-            self._append_db_util_result(f"Loaded {len(case_list)} case numbers into dropdown.")
-        else:
-            self.db_case_num_combo['values'] = []
-            self.db_case_num_combo.set('')
-            self.db_case_num_combo.config(state="disabled")
-            self._append_db_util_result("No case numbers found or error loading list for dropdown.")
-        self.status_var.set("Case number list loaded.")
-   
+        self.db_utils_tab.setLayout(layout)
 
-    def browse_directory(self, entry_widget):
-        directory = filedialog.askdirectory()
+    ### Utility Methods ###
+
+    def browse_directory(self, line_edit):
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
         if directory:
-            entry_widget.delete(0, tk.END)
-            entry_widget.insert(0, directory)
-    
-    def browse_file(self, entry_widget, file_types):
-        file_path = filedialog.askopenfilename(filetypes=file_types)
-        if file_path:
-            entry_widget.delete(0, tk.END)
-            entry_widget.insert(0, file_path)
-    
+            line_edit.setText(directory)
+
     def check_unread_emails(self):
         try:
-            # Clear previous results
-            self.outlook_result_text.delete(1.0, tk.END)
-            
-            category = self.category_entry.get()
+            self.outlook_result_text.clear()
+            category = self.category_entry.text()
             if not category:
-                messagebox.showerror("Error", "Please enter an email category.")
+                QMessageBox.critical(self, "Error", "Please enter an email category.")
                 return
-                
-            # Create OutlookProcessor instance
-            processor = OutlookProcessor(
-                category,
-                [],  # Empty senders list for just checking
-                "",  # Empty path for just checking
-                ""   # Empty path for just checking
-            )
-            
-            # Check unread emails count
+            processor = OutlookProcessor(category, [], "", "")
             unread_count = processor.list_unread_emails()
-            
-            self.outlook_result_text.insert(tk.END, f"Found {unread_count} unread emails with category '{category}'.\n")
-            self.status_var.set(f"Found {unread_count} unread emails")
-            
+            self.outlook_result_text.append(f"Found {unread_count} unread emails with category '{category}'.")
+            self.status_bar.showMessage(f"Found {unread_count} unread emails")
         except Exception as e:
-            self.outlook_result_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.status_var.set("Error checking emails")
-    
+            self.outlook_result_text.append(f"Error: {str(e)}")
+            self.status_bar.showMessage("Error checking emails")
+
     def process_emails(self):
         try:
-            # Clear previous results
-            self.outlook_result_text.delete(1.0, tk.END)
-            
-            category = self.category_entry.get()
-            senders = [s.strip() for s in self.senders_entry.get().split(",") if s.strip()]
-            attachment_path = self.attachment_path_entry.get()
-            msg_path = self.msg_path_entry.get()
-            
-            if not category or not senders or not attachment_path or not msg_path:
-                messagebox.showerror("Error", "Please fill in all required fields.")
+            self.outlook_result_text.clear()
+            category = self.category_entry.text()
+            senders = [s.strip() for s in self.senders_entry.text().split(",") if s.strip()]
+            attachment_path = self.attachment_path_entry.text()
+            msg_path = self.msg_path_entry.text()
+
+            if not all([category, senders, attachment_path, msg_path]):
+                QMessageBox.critical(self, "Error", "Please fill in all required fields.")
                 return
-                
-            self.outlook_result_text.insert(tk.END, "Starting email processing...\n")
-            self.status_var.set("Processing emails...")
-            self.root.update()
-            
-            # Create OutlookProcessor instance
-            processor = OutlookProcessor(
-                category,
-                senders,
-                attachment_path,
-                msg_path
-            )
-            
-            # Process emails in a separate thread to keep the UI responsive
+
+            self.outlook_result_text.append("Starting email processing...")
+            self.status_bar.showMessage("Processing emails...")
+
             def process_thread():
+                processor = OutlookProcessor(category, senders, attachment_path, msg_path)
                 processor.download_attachments_and_save_as_msg(
-                    self.save_emails_var.get(),
-                    self.mark_as_read_var.get()
+                    self.save_emails_check.isChecked(),
+                    self.mark_as_read_check.isChecked()
                 )
-                
-                # Update UI from the main thread
-                self.root.after(0, lambda: self.update_outlook_results(processor))
-            
+                QTimer.singleShot(0, lambda: self.update_outlook_results(processor))
+
             threading.Thread(target=process_thread, daemon=True).start()
-            
         except Exception as e:
-            self.outlook_result_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.status_var.set("Error processing emails")
-    
+            self.outlook_result_text.append(f"Error: {str(e)}")
+            self.status_bar.showMessage("Error processing emails")
+
     def update_outlook_results(self, processor):
-        self.outlook_result_text.insert(tk.END, "Email processing completed.\n\n")
-        
-        # Display results
-        self.outlook_result_text.insert(tk.END, f"Emails processed: {len(processor.processed_emails)}\n")
-        
+        self.outlook_result_text.append("Email processing completed.\n")
+        self.outlook_result_text.append(f"Emails processed: {len(processor.processed_emails)}\n")
         if processor.emails_with_pdf:
-            self.outlook_result_text.insert(tk.END, "\nEmails with PDF attachments:\n")
+            self.outlook_result_text.append("\nEmails with PDF attachments:\n")
             for subject in processor.emails_with_pdf:
-                self.outlook_result_text.insert(tk.END, f"- {subject}\n")
-                
+                self.outlook_result_text.append(f"- {subject}\n")
         if processor.emails_with_nvf_new_vendor:
-            self.outlook_result_text.insert(tk.END, "\nEmails with NVF or New Vendor attachments:\n")
+            self.outlook_result_text.append("\nEmails with NVF or New Vendor attachments:\n")
             for subject in processor.emails_with_nvf_new_vendor:
-                self.outlook_result_text.insert(tk.END, f"- {subject}\n")
-        
-        self.status_var.set("Email processing completed")
-    
+                self.outlook_result_text.append(f"- {subject}\n")
+        self.status_bar.showMessage("Email processing completed")
+
     def process_case_list(self):
         try:
-            # Clear previous results
-            self.case_list_result_text.delete(1.0, tk.END)
-            
-            excel_folder = self.excel_folder_entry.get()
-            list_folder = self.list_folder_entry.get()
-            
-            if not excel_folder or not list_folder:
-                messagebox.showerror("Error", "Please select both folders.")
+            self.case_list_result_text.clear()
+            excel_folder = self.excel_folder_entry.text()
+            list_folder = self.list_folder_entry.text()
+
+            if not all([excel_folder, list_folder]):
+                QMessageBox.critical(self, "Error", "Please select both folders.")
                 return
-                
-            self.case_list_result_text.insert(tk.END, "Processing case list...\n")
-            self.status_var.set("Processing case list...")
-            self.root.update()
-            
-            # Create CaseList instance
-            case_list = CaseList(excel_folder, list_folder)
-            
-            # Process in a separate thread
+
+            self.case_list_result_text.append("Processing case list...")
+            self.status_bar.showMessage("Processing case list...")
+
             def process_thread():
+                case_list = CaseList(excel_folder, list_folder)
                 duplicate_counts, error_messages = case_list.process_excel_files()
-                
-                # Update UI from the main thread
-                self.root.after(0, lambda: self.update_case_list_results(duplicate_counts, error_messages))
-            
+                QTimer.singleShot(0, lambda: self.update_case_list_results(duplicate_counts, error_messages))
+
             threading.Thread(target=process_thread, daemon=True).start()
-            
         except Exception as e:
-            self.case_list_result_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.status_var.set("Error processing case list")
-    
+            self.case_list_result_text.append(f"Error: {str(e)}")
+            self.status_bar.showMessage("Error processing case list")
+
     def update_case_list_results(self, duplicate_counts, error_messages):
-        self.case_list_result_text.insert(tk.END, "Case list processing completed.\n\n")
-        
-        # Show duplicates
+        self.case_list_result_text.append("Case list processing completed.\n")
         duplicates = sum(1 for count in duplicate_counts.values() if count > 0)
-        self.case_list_result_text.insert(tk.END, f"Found {duplicates} duplicate cases.\n")
-        
+        self.case_list_result_text.append(f"Found {duplicates} duplicate cases.\n")
         if duplicates > 0:
-            self.case_list_result_text.insert(tk.END, "\nDuplicate cases:\n")
+            self.case_list_result_text.append("\nDuplicate cases:\n")
             for value, count in duplicate_counts.items():
                 if count > 0:
-                    self.case_list_result_text.insert(tk.END, f"- {value} (Duplicated {count} times)\n")
-        
-        # Show errors
+                    self.case_list_result_text.append(f"- {value} (Duplicated {count} times)\n")
         if error_messages:
-            self.case_list_result_text.insert(tk.END, "\nErrors encountered:\n")
+            self.case_list_result_text.append("\nErrors encountered:\n")
             for error in error_messages:
-                self.case_list_result_text.insert(tk.END, f"- {error}\n")
-        
-        self.status_var.set("Case list processing completed")
-    
-    def transpose_excel(self):
-        try:
-            # Clear previous results
-            self.transpose_result_text.delete(1.0, tk.END)
-            
-            excel_file = self.excel_file_entry.get()
-            sheet_name = self.sheet_name_entry.get().strip()
-            
-            if not excel_file:
-                messagebox.showerror("Error", "Please select an Excel file.")
-                return
-                
-            self.transpose_result_text.insert(tk.END, "Transposing Excel data...\n")
-            self.status_var.set("Transposing Excel...")
-            self.root.update()
-            
-            # Create ExcelTransposer instance
-            transposer = ExcelTransposer(excel_file)
-            
-            # Set active sheet if specified
-            if sheet_name:
-                try:
-                    transposer.set_active_sheet(sheet_name)
-                except ValueError as e:
-                    self.transpose_result_text.insert(tk.END, f"Error: {str(e)}\n")
-                    self.status_var.set("Error transposing Excel")
-                    return
-            
-            # Transpose in a separate thread
-            def transpose_thread():
-                transposer.transpose_cells_to_table()
-                
-                # Update UI from the main thread
-                self.root.after(0, lambda: self.update_transpose_results(excel_file))
-            
-            threading.Thread(target=transpose_thread, daemon=True).start()
-            
-        except Exception as e:
-            self.transpose_result_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.status_var.set("Error transposing Excel")
-    
-    def update_transpose_results(self, excel_file):
-        self.transpose_result_text.insert(tk.END, "Excel transposition completed.\n\n")
-        self.transpose_result_text.insert(tk.END, f"Transposed data saved to '{excel_file}' in a new sheet named 'Transposed'.\n")
-        self.status_var.set("Excel transposition completed")
-    
+                self.case_list_result_text.append(f"- {error}\n")
+        self.status_bar.showMessage("Case list processing completed")
+
     def scrape_excel_files(self):
         try:
-            # Clear previous results
-            self.scrape_result_text.delete(1.0, tk.END)
-            
-            directory = self.scrape_dir_entry.get()
-            range_start = self.range_start_entry.get()
-            range_end = self.range_end_entry.get()
-            read_headers = self.read_headers_var.get()
-            
+            self.scrape_result_text.clear()
+            directory = self.scrape_dir_entry.text()
+            range_start = self.range_start_entry.text()
+            range_end = self.range_end_entry.text()
+            read_headers = self.read_headers_check.isChecked()
+
             if not directory:
-                messagebox.showerror("Error", "Please select a directory with Excel files.")
+                QMessageBox.critical(self, "Error", "Please select a directory with Excel files.")
                 return
-                
-            self.scrape_result_text.insert(tk.END, f"Scraping Excel files in {directory}...\n")
-            self.status_var.set("Scraping Excel files...")
-            self.root.update()
-            
-            # Set directory for Excel scraper
+
+            self.scrape_result_text.append(f"Scraping Excel files in {directory}...")
+            self.status_bar.showMessage("Scraping Excel files...")
             self.excel_scraper.set_directory(directory)
-            
-            # Scrape in a separate thread
+
             def scrape_thread():
                 results = self.excel_scraper.scrape_excel_files(range_start, range_end, read_headers)
-                
-                # Update UI from the main thread
-                self.root.after(0, lambda: self.update_scrape_results(results))
-            
+                QTimer.singleShot(0, lambda: self.update_scrape_results(results))
+
             threading.Thread(target=scrape_thread, daemon=True).start()
-            
         except Exception as e:
-            self.scrape_result_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.status_var.set("Error scraping Excel files")
-    
+            self.scrape_result_text.append(f"Error: {str(e)}")
+            self.status_bar.showMessage("Error scraping Excel files")
+
     def update_scrape_results(self, results):
-        self.scrape_result_text.delete(1.0, tk.END)
-        self.scrape_result_text.insert(tk.END, f"Scraped {len(results)} Excel files.\n\n")
-        
-        # Display headers
+        self.scrape_result_text.clear()
+        self.scrape_result_text.append(f"Scraped {len(results)} Excel files.\n\n")
         headers = self.excel_scraper.get_headers()
         if headers:
-            self.scrape_result_text.insert(tk.END, "Headers found: " + ", ".join(headers) + "\n\n")
-        
-        # Display results in a tabular format
+            self.scrape_result_text.append("Headers found: " + ", ".join(headers) + "\n\n")
         if results:
-            # Create header line
             header_line = f"{'Filename':<30} | "
             if headers:
                 for header in headers:
                     header_line += f"{str(header):<15} | "
             else:
-                # Use keys from the first result
                 for key in results[0]["values"].keys():
                     header_line += f"{str(key):<15} | "
-            
-            self.scrape_result_text.insert(tk.END, header_line + "\n")
-            self.scrape_result_text.insert(tk.END, "-" * len(header_line) + "\n")
-            
-            # Add each result row
+            self.scrape_result_text.append(header_line + "\n")
+            self.scrape_result_text.append("-" * len(header_line) + "\n")
             for result in results:
                 line = f"{result['filename']:<30} | "
                 for key, value in result["values"].items():
                     if value is None:
                         value = ""
                     line += f"{str(value):<15} | "
-                self.scrape_result_text.insert(tk.END, line + "\n")
-        
-        self.status_var.set(f"Scraped {len(results)} Excel files")
-    
+                self.scrape_result_text.append(line + "\n")
+        self.status_bar.showMessage(f"Scraped {len(results)} Excel files")
+
+    def export_to_excel(self):
+        try:
+            if not self.excel_scraper.get_results():
+                QMessageBox.critical(self, "Error", "No data to export. Please scrape Excel files first.")
+                return
+            output_file, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+            if not output_file:
+                return
+            success = self.excel_scraper.save_results_to_excel(output_file)
+            if success:
+                QMessageBox.information(self, "Success", f"Data exported to {output_file}")
+                self.status_bar.showMessage("Data exported to Excel")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to export data")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Export error: {str(e)}")
+            self.status_bar.showMessage("Error exporting data")
+
     def export_to_csv(self):
         try:
             if not self.excel_scraper.get_results():
-                messagebox.showerror("Error", "No data to export. Please scrape Excel files first.")
+                QMessageBox.critical(self, "Error", "No data to export. Please scrape Excel files first.")
                 return
-                
-            output_file = filedialog.asksaveasfilename(
-                defaultextension=".csv",
-                filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
-            )
-            
+            output_file, _ = QFileDialog.getSaveFileName(self, "Save CSV File", "", "CSV Files (*.csv);;All Files (*)")
             if not output_file:
-                return  # User cancelled
-                
+                return
             success = self.excel_scraper.save_results_to_csv(output_file)
-            
             if success:
-                messagebox.showinfo("Success", f"Data exported to {output_file}")
-                self.status_var.set("Data exported to CSV")
+                QMessageBox.information(self, "Success", f"Data exported to {output_file}")
+                self.status_bar.showMessage("Data exported to CSV")
             else:
-                messagebox.showerror("Error", "Failed to export data")
-                
+                QMessageBox.critical(self, "Error", "Failed to export data")
         except Exception as e:
-            messagebox.showerror("Error", f"Export error: {str(e)}")
-            self.status_var.set("Error exporting data")
-    
+            QMessageBox.critical(self, "Error", f"Export error: {str(e)}")
+            self.status_bar.showMessage("Error exporting data")
+
     def add_to_database(self):
         try:
-            if not self.excel_scraper.get_results():
-                messagebox.showerror("Error", "No data to add. Please scrape Excel files first.")
-                return
-
-            db_handler = DatabaseHandler(status_var=self.status_var)
-            # You may need this only if you still want to pass scraped results
-            # but in the refactored version above, we bypass scraped data.
-            db_handler.add_to_database()
-
+            file_paths, _ = QFileDialog.getOpenFileNames(self, "Select Files", "", "Text Files (*.txt);;Excel Files (*.xlsx);;All Files (*)")
+            if file_paths:
+                self.db_handler.process_files_to_database(file_paths)  # Assumes this method exists in DatabaseHandler
+                self.status_bar.showMessage("Files added to database")
         except Exception as e:
-            messagebox.showerror("Error", f"Database error: {str(e)}")
-            self.status_var.set("Error adding data to database")
+            QMessageBox.critical(self, "Error", f"Database error: {str(e)}")
+            self.status_bar.showMessage("Error adding data to database")
 
-    # --- Methods for the Database Utilities Tab (some modified, some new) ---
-    def _append_db_util_result(self, message): # Helper
-        self.db_utils_result_text.insert(tk.END, str(message) + "\n")
-        self.db_utils_result_text.see(tk.END) 
+    ### Database Utilities Methods ###
 
-    def run_verify_bank_accounts(self): # No change in logic, just uses the central handler
-        self.db_utils_result_text.delete(1.0, tk.END)
+    def _append_db_util_result(self, message):
+        self.db_utils_result_text.append(str(message))
+
+    def run_verify_bank_accounts(self):
+        self.db_utils_result_text.clear()
         self._append_db_util_result("Attempting to verify bank accounts...")
-        self.status_var.set("Verifying bank accounts...")
-        self.db_handler.verify_bank_accounts_in_combined_db() 
+        self.status_bar.showMessage("Verifying bank accounts...")
+        self.db_handler.verify_bank_accounts_in_combined_db()
         self._append_db_util_result("Bank account verification process finished. Check status bar and pop-up messages.")
 
-    def run_setup_project_schema(self): # No change in logic
-        self.db_utils_result_text.delete(1.0, tk.END)
+    def run_setup_project_schema(self):
+        self.db_utils_result_text.clear()
         self._append_db_util_result(f"Attempting to set up/verify schema in '{relational_db_operations.PROJECT_DB_PATH}'...")
-        self.status_var.set("Setting up project schema...")
+        self.status_bar.showMessage("Setting up project schema...")
         try:
             relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
             msg = f"Schema operation completed for {os.path.basename(relational_db_operations.PROJECT_DB_PATH)}."
             self._append_db_util_result(msg)
-            messagebox.showinfo("Schema Setup", msg)
-            self.status_var.set("Project schema setup complete.")
+            QMessageBox.information(self, "Schema Setup", msg)
+            self.status_bar.showMessage("Project schema setup complete.")
         except Exception as e:
             err_msg = f"Error during schema setup: {e}"
             self._append_db_util_result(err_msg)
-            messagebox.showerror("Schema Error", err_msg)
-            self.status_var.set("Error in schema setup.")
+            QMessageBox.critical(self, "Schema Error", err_msg)
+            self.status_bar.showMessage("Error in schema setup.")
 
-    # NEW method to call the new population function
     def run_populate_project_data_from_combined_db(self):
-        self.db_utils_result_text.delete(1.0, tk.END)
+        self.db_utils_result_text.clear()
         self._append_db_util_result(f"Attempting to populate '{relational_db_operations.PROJECT_DB_PATH}' from '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}'...")
-        self.status_var.set("Populating project DB from Combined.db...")
+        self.status_bar.showMessage("Populating project DB from Combined.db...")
         try:
-            # Ensure schema exists first
             if not os.path.exists(relational_db_operations.PROJECT_DB_PATH):
-                 self._append_db_util_result(f"Database {relational_db_operations.PROJECT_DB_PATH} not found. Running schema setup first.")
-                 relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
-                 self._append_db_util_result("Schema setup complete.")
-            
-            # Pass the COMBINED_DB_PATH_FOR_VERIFICATION from utils.database_handler
+                self._append_db_util_result(f"Database {relational_db_operations.PROJECT_DB_PATH} not found. Running schema setup first.")
+                relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
+                self._append_db_util_result("Schema setup complete.")
             count = relational_db_operations.populate_project_data_from_combined_db(
                 relational_db_operations.PROJECT_DB_PATH,
-                COMBINED_DB_PATH_FOR_VERIFICATION, # Use the path defined in utils.database_handler
+                COMBINED_DB_PATH_FOR_VERIFICATION,
                 text_widget_update=self._append_db_util_result
             )
             msg = f"Population from Combined.db complete. Processed/updated {count} main entries."
-            self._append_db_util_result(msg) # Already printed by the function, but good summary
-            messagebox.showinfo("Data Population", msg)
-            self.status_var.set("Population from Combined.db complete.")
+            self._append_db_util_result(msg)
+            QMessageBox.information(self, "Data Population", msg)
+            self.status_bar.showMessage("Population from Combined.db complete.")
         except Exception as e:
             err_msg = f"Error during data population: {e}"
             self._append_db_util_result(err_msg)
-            messagebox.showerror("Population Error", err_msg)
-            self.status_var.set("Error in data population.")
+            QMessageBox.critical(self, "Population Error", err_msg)
+            self.status_bar.showMessage("Error in data population.")
 
-
-    def run_display_users_with_bank_accounts(self): # No change in logic
-        self.db_utils_result_text.delete(1.0, tk.END)
+    def run_display_users_with_bank_accounts(self):
+        self.db_utils_result_text.clear()
         self._append_db_util_result(f"Fetching users with bank accounts from '{relational_db_operations.PROJECT_DB_PATH}'...")
-        self.status_var.set("Fetching users with accounts...")
+        self.status_bar.showMessage("Fetching users with accounts...")
         try:
             df = relational_db_operations.display_users_with_bank_accounts(relational_db_operations.PROJECT_DB_PATH, text_widget_update=self._append_db_util_result)
-            # Output handling is now inside display_users_with_bank_accounts if text_widget_update is passed
-            # or you can add more specific GUI updates here based on df
             if df is not None and not df.empty:
-                 self._append_db_util_result("\n--- Users with Bank Accounts (via Cases) ---") # Example of adding more context
-                 self._append_db_util_result(df.to_string())
-            elif df is not None and df.empty :
-                 self._append_db_util_result("No users found with bank accounts linked to their cases.")
-            self.status_var.set("Displayed users with accounts.")
+                self._append_db_util_result("\n--- Users with Bank Accounts (via Cases) ---")
+                self._append_db_util_result(df.to_string())
+            elif df is not None and df.empty:
+                self._append_db_util_result("No users found with bank accounts linked to their cases.")
+            self.status_bar.showMessage("Displayed users with accounts.")
         except Exception as e:
             self._append_db_util_result(f"Error displaying users: {e}")
-            self.status_var.set("Error displaying users.")
+            self.status_bar.showMessage("Error displaying users.")
 
-
-    def run_display_cases_for_university(self): # MODIFIED to get uni_name from Combobox
-        self.db_utils_result_text.delete(1.0, tk.END)
-        uni_name = self.db_uni_name_combo.get() # Get from Combobox
+    def run_display_cases_for_university(self):
+        self.db_utils_result_text.clear()
+        uni_name = self.db_uni_name_combo.currentText()
         if not uni_name:
-            messagebox.showerror("Input Error", "Please select a University Name from the dropdown.")
-            self.status_var.set("University not selected.")
+            QMessageBox.critical(self, "Input Error", "Please select a University Name from the dropdown.")
+            self.status_bar.showMessage("University not selected.")
             return
         self._append_db_util_result(f"Fetching cases for university '{uni_name}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
-        self.status_var.set(f"Fetching cases for {uni_name}...")
+        self.status_bar.showMessage(f"Fetching cases for {uni_name}...")
         try:
             df = relational_db_operations.display_all_cases_for_university(relational_db_operations.PROJECT_DB_PATH, uni_name, text_widget_update=self._append_db_util_result)
             if df is not None and not df.empty:
@@ -725,35 +558,66 @@ class ExcelProcessorApp:
                 self._append_db_util_result(df.to_string())
             elif df is not None and df.empty:
                 self._append_db_util_result(f"No cases found for university: '{uni_name}'")
-            self.status_var.set(f"Displayed cases for {uni_name}.")
+            self.status_bar.showMessage(f"Displayed cases for {uni_name}.")
         except Exception as e:
             self._append_db_util_result(f"Error displaying cases: {e}")
-            self.status_var.set("Error displaying cases.")
+            self.status_bar.showMessage("Error displaying cases.")
 
-    def run_display_university_for_case(self): # MODIFIED to get case_num from Combobox
-        self.db_utils_result_text.delete(1.0, tk.END)
-        case_num = self.db_case_num_combo.get() # Get from Combobox
+    def run_display_university_for_case(self):
+        self.db_utils_result_text.clear()
+        case_num = self.db_case_num_combo.currentText()
         if not case_num:
-            messagebox.showerror("Input Error", "Please select a Case Number from the dropdown.")
-            self.status_var.set("Case number not selected.")
+            QMessageBox.critical(self, "Input Error", "Please select a Case Number from the dropdown.")
+            self.status_bar.showMessage("Case number not selected.")
             return
         self._append_db_util_result(f"Fetching university for case '{case_num}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
-        self.status_var.set(f"Fetching university for {case_num}...")
+        self.status_bar.showMessage(f"Fetching university for {case_num}...")
         try:
             df = relational_db_operations.display_university_for_case(relational_db_operations.PROJECT_DB_PATH, case_num, text_widget_update=self._append_db_util_result)
             if df is not None and not df.empty:
                 self._append_db_util_result(f"\n--- University for Case Number: {case_num} ---")
                 self._append_db_util_result(df.to_string())
             elif df is not None and df.empty:
-                 self._append_db_util_result(f"No university found for case number: '{case_num}' (or case does not exist).")
-            self.status_var.set(f"Displayed university for {case_num}.")
+                self._append_db_util_result(f"No university found for case number: '{case_num}' (or case does not exist).")
+            self.status_bar.showMessage(f"Displayed university for {case_num}.")
         except Exception as e:
             self._append_db_util_result(f"Error displaying university: {e}")
-            self.status_var.set("Error displaying university.")
+            self.status_bar.showMessage("Error displaying university.")
 
+    def load_university_combo_data(self):
+        self.status_bar.showMessage("Loading university list...")
+        self._append_db_util_result("Fetching unique universities from bank_acc_db.db...")
+        uni_list = relational_db_operations.get_unique_universities_from_bank_acc_db(
+            BANK_ACC_DB_PATH_FOR_VERIFICATION,
+            text_widget_update=self._append_db_util_result
+        )
+        self.db_uni_name_combo.clear()
+        self.db_uni_name_combo.addItems(uni_list)
+        if uni_list:
+            self.db_uni_name_combo.setCurrentIndex(0)
+            self.db_uni_name_combo.setEnabled(True)
+        else:
+            self.db_uni_name_combo.setEnabled(False)
+        self.status_bar.showMessage("University list loaded.")
+
+    def load_case_number_combo_data(self):
+        self.status_bar.showMessage("Loading case number list...")
+        self._append_db_util_result(f"Fetching unique case numbers from {os.path.basename(relational_db_operations.CASE_LIST_DB_PATH)}...")
+        case_list = relational_db_operations.get_unique_case_numbers_from_case_list_db(
+            relational_db_operations.CASE_LIST_DB_PATH,
+            text_widget_update=self._append_db_util_result
+        )
+        self.db_case_num_combo.clear()
+        self.db_case_num_combo.addItems(case_list)
+        if case_list:
+            self.db_case_num_combo.setCurrentIndex(0)
+            self.db_case_num_combo.setEnabled(True)
+        else:
+            self.db_case_num_combo.setEnabled(False)
+        self.status_bar.showMessage("Case number list loaded.")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = ExcelProcessorApp(root)
-    root.mainloop()
-
+    app = QApplication(sys.argv)
+    window = ExcelProcessorApp()
+    window.show()
+    sys.exit(app.exec())
