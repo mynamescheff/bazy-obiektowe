@@ -466,10 +466,53 @@ class ExcelProcessorApp(QMainWindow):
 
     def add_to_database(self):
         try:
-            file_paths, _ = QFileDialog.getOpenFileNames(self, "Select Files", "", "Text Files (*.txt);;Excel Files (*.xlsx);;All Files (*)")
-            if file_paths:
-                self.db_handler.process_files_to_database(file_paths)  # Assumes this method exists in DatabaseHandler
-                self.status_bar.showMessage("Files added to database")
+            # Step 1: Select and convert .txt file
+            txt_file_path, _ = QFileDialog.getOpenFileName(
+                self, "Select a .txt File", "", "Text Files (*.txt)"
+            )
+            if txt_file_path:
+                self.status_bar.showMessage("Converting .txt file to database...")
+                try:
+                    db_path = self.db_handler._convert_text_to_db(txt_file_path)
+                    QMessageBox.information(
+                        self, "Success",
+                        f"Converted {os.path.basename(txt_file_path)} to {os.path.basename(db_path)}"
+                    )
+                except Exception as e:
+                    QMessageBox.critical(
+                        self, "Error",
+                        f"Failed to convert {os.path.basename(txt_file_path)}: {str(e)}"
+                    )
+                    self.status_bar.showMessage("Error converting .txt file")
+                    return
+            else:
+                self.status_bar.showMessage("TXT file selection canceled.")
+                return
+
+            # Step 2: Select and convert .xlsx file
+            excel_file_path, _ = QFileDialog.getOpenFileName(
+                self, "Select an Excel File", "", "Excel Files (*.xlsx *.xls)"
+            )
+            if excel_file_path:
+                self.status_bar.showMessage("Converting Excel file to database...")
+                try:
+                    db_path = self.db_handler._convert_excel_to_db(excel_file_path)
+                    QMessageBox.information(
+                        self, "Success",
+                        f"Converted {os.path.basename(excel_file_path)} to {os.path.basename(db_path)}"
+                    )
+                except Exception as e:
+                    QMessageBox.critical(
+                        self, "Error",
+                        f"Failed to convert {os.path.basename(excel_file_path)}: {str(e)}"
+                    )
+                    self.status_bar.showMessage("Error converting Excel file")
+                    return
+            else:
+                self.status_bar.showMessage("Excel file selection canceled.")
+                return
+
+            self.status_bar.showMessage("File to DB conversion process complete.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Database error: {str(e)}")
             self.status_bar.showMessage("Error adding data to database")
