@@ -1,18 +1,41 @@
 import re
 from functools import partial
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
 from PyQt6.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QLabel, QMessageBox, QMainWindow, \
-    QVBoxLayout, QTableView, QInputDialog, QDialog, QFormLayout, QComboBox
+    QVBoxLayout, QTableView, QInputDialog, QDialog, QFormLayout, QComboBox, QTabWidget
 import sys
 import sqlite3
 import bcrypt
+from main import ExcelProcessorApp
 
+def init_database():
+    try:
+        conn = sqlite3.connect('project_2.db')
+        conn.execute("PRAGMA foreign_keys = ON")
+        c = conn.cursor()
+        c.execute("""CREATE TABLE IF NOT EXISTS Employees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            second_name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            role TEXT DEFAULT 'Employee')
+        """)
+        c.execute("""CREATE TABLE IF NOT EXISTS Users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            login TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            employee_id INTEGER UNIQUE,
+            must_change_password INTEGER DEFAULT 0,
+            FOREIGN KEY (employee_id) REFERENCES Employees(id) ON DELETE CASCADE)
+        """)
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"Database initialization error: {e}")
 
-
-class MainWindow(QMainWindow):
+class MainWindow(ExcelProcessorApp):
     def __init__(self, register_window, login_window):
         super().__init__()
         self.setWindowTitle("Ekran Główny")
@@ -20,25 +43,27 @@ class MainWindow(QMainWindow):
         self.register_window = register_window
         self.login_window = login_window
 
-        menu = self.menuBar()
 
+        menu = self.menuBar()
         file_menu = menu.addMenu("File")
         option1_action = QAction("Outlook Processor", self)
+        option1_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(0))
         file_menu.addAction(option1_action)
         option2_action = QAction("Case List", self)
+        option2_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(1))
         file_menu.addAction(option2_action)
-        option3_action = QAction("Excel Scalper", self)
+        option3_action = QAction("Excel Scraper", self)
+        option3_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(2))
         file_menu.addAction(option3_action)
         option4_action = QAction("Database Utilities", self)
+        option4_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(3))
         file_menu.addAction(option4_action)
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.back_or_quit)
         file_menu.addAction(exit_action)
 
-        option_menu = menu.addMenu("Option")
 
         help_menu = menu.addMenu("Help")
-
         about_menu = menu.addMenu("About")
         version_action = QAction("Version", self)
         version_action.triggered.connect(self.version)
@@ -69,6 +94,7 @@ class MainWindow(QMainWindow):
             self.back_to_login()
         else:
             pass
+
 class LoginWindow(QWidget):
     def __init__(self, register_window, main_window, admin_window):
         super().__init__()
@@ -215,17 +241,14 @@ class ChangePasswordWindow(QDialog):
             conn.execute("PRAGMA foreign_keys = ON")
             c = conn.cursor()
 
-
             c.execute("SELECT password FROM Users WHERE employee_id = ?", (self.employee_id,))
             result = c.fetchone()
             if result:
                 old_password_crypted = result[0]
-
                 if bcrypt.checkpw(new_password.encode('utf-8'), old_password_crypted.encode('utf-8')):
                     QMessageBox.warning(self, "Błąd", "Nowe hasło musi różnić się od starego hasła!")
                     conn.close()
                     return
-
 
             password_crypted = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             c.execute("UPDATE Users SET password = ?, must_change_password = 0 WHERE employee_id = ?",
@@ -360,23 +383,6 @@ class RegisterWindow(QWidget):
             conn.execute("PRAGMA foreign_keys = ON")
             c = conn.cursor()
 
-            c.execute("""CREATE TABLE IF NOT EXISTS Employees (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                second_name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                role TEXT DEFAULT 'Employee')
-            """)
-
-            c.execute("""CREATE TABLE IF NOT EXISTS Users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                login TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                employee_id INTEGER UNIQUE,
-                must_change_password INTEGER DEFAULT 0,
-                FOREIGN KEY (employee_id) REFERENCES Employees(id) ON DELETE CASCADE)
-            """)
-
             c.execute("SELECT 1 FROM Users WHERE login = ?", (login,))
             if c.fetchone():
                 QMessageBox.warning(self, "Błąd", "Użytkownik o takim loginie już istnieje")
@@ -418,8 +424,6 @@ class RegisterWindow(QWidget):
         self.hide()
         self.login_window.show()
 
-
-
 class AdminWindow(MainWindow):
     def __init__(self, register_window, login_window):
         super().__init__(register_window, login_window)
@@ -428,8 +432,12 @@ class AdminWindow(MainWindow):
         self.register_window = register_window
         self.login_window = login_window
 
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        self.admin_tab = QWidget()
+        self.tab_widget.addTab(self.admin_tab, "Admin")
+        self.tab_widget.setCurrentWidget(self.admin_tab)
+
+
+        self.register_data()
 
         menu = self.menuBar()
         admin_menu = menu.addMenu("Admin")
@@ -440,12 +448,8 @@ class AdminWindow(MainWindow):
         self.register_data()
 
     def register_data(self):
-        if self.centralWidget():
-            self.centralWidget().deleteLater()
-
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
-
+        layout = QVBoxLayout(self.admin_tab)
+        print("Test")
 
         db = QSqlDatabase.addDatabase("QSQLITE", f"admin_db_{id(self)}")
         db.setDatabaseName("project_2.db")
@@ -453,14 +457,12 @@ class AdminWindow(MainWindow):
             QMessageBox.warning(self, "Błąd", "Nie udało się połączyć z bazą danych")
             return
 
-
         query = QSqlQuery(db)
         query.exec("PRAGMA foreign_keys = ON")
         if query.lastError().isValid():
             QMessageBox.warning(self, "Błąd", f"Nie udało się włączyć kluczy obcych: {query.lastError().text()}")
             db.close()
             return
-
 
         self.model = QSqlTableModel(self, db)
         self.model.setTable("Employees")
@@ -470,18 +472,15 @@ class AdminWindow(MainWindow):
             db.close()
             return
 
-
         column_count = self.model.columnCount()
         self.model.insertColumn(column_count)
         self.model.setHeaderData(column_count, Qt.Orientation.Horizontal, "Delete")
         self.model.insertColumn(column_count + 1)
         self.model.setHeaderData(column_count + 1, Qt.Orientation.Horizontal, "Modify")
 
-
         self.table_view = QTableView()
         self.table_view.setModel(self.model)
         self.table_view.setColumnHidden(0, True)
-
 
         self.add_button_to_table()
 
@@ -489,11 +488,10 @@ class AdminWindow(MainWindow):
         self.add_button = QPushButton("Add new user")
         self.add_button.clicked.connect(self.add_new_user)
         layout.addWidget(self.add_button)
-        self.setCentralWidget(central_widget)
 
     def add_button_to_table(self):
-        delete_column = self.model.columnCount() - 2  # Przedostatnia kolumna
-        modify_column = self.model.columnCount() - 1  # Ostatnia kolumna
+        delete_column = self.model.columnCount() - 2
+        modify_column = self.model.columnCount() - 1
         for row in range(self.model.rowCount()):
             delete_button = QPushButton("Delete")
             delete_button.setStyleSheet("background-color: red; color: white;")
@@ -514,7 +512,7 @@ class AdminWindow(MainWindow):
             if self.model.removeRow(row):
                 if self.model.submitAll():
                     QMessageBox.information(self, "Sukces", "Użytkownik usunięty pomyślnie.")
-                    self.register_data()  # Odśwież tabelę po usunięciu
+                    self.register_data()
                 else:
                     error = self.model.lastError().text()
                     QMessageBox.critical(self, "Błąd", f"Nie udało się usunąć użytkownika: {error}")
@@ -581,10 +579,10 @@ class EditEmployeeWindow(QDialog):
             QMessageBox.warning(self, "Błąd", "Nieprawidłowy adres email!")
             return
 
-        self.model.setData(self.model.index(self.row, 1), self.name_input.text())  # name
-        self.model.setData(self.model.index(self.row, 2), self.second_name_input.text())  # second_name
-        self.model.setData(self.model.index(self.row, 3), self.email_input.text())  # email
-        self.model.setData(self.model.index(self.row, 4), self.role_combo.currentText())  # role
+        self.model.setData(self.model.index(self.row, 1), self.name_input.text())
+        self.model.setData(self.model.index(self.row, 2), self.second_name_input.text())
+        self.model.setData(self.model.index(self.row, 3), self.email_input.text())
+        self.model.setData(self.model.index(self.row, 4), self.role_combo.currentText())
         if self.model.submitAll():
             QMessageBox.information(self, "Sukces", "Dane pracownika zaktualizowane.")
             self.close()
@@ -654,7 +652,6 @@ class AddNewUserWindow(QDialog):
         confirm_password = self.confirm_password_input.text().strip()
         role = self.role_combo.currentText()
 
-
         if not all([name, second_name, email, login, password, confirm_password]):
             QMessageBox.warning(self, "Błąd", "Wszystkie pola muszą być wypełnione!")
             return
@@ -676,13 +673,11 @@ class AddNewUserWindow(QDialog):
             conn.execute("PRAGMA foreign_keys = ON")
             c = conn.cursor()
 
-
             c.execute("SELECT 1 FROM Users WHERE login = ?", (login,))
             if c.fetchone():
                 QMessageBox.warning(self, "Błąd", "Użytkownik o takim loginie już istnieje!")
                 conn.close()
                 return
-
 
             c.execute("SELECT 1 FROM Employees WHERE email = ?", (email,))
             if c.fetchone():
@@ -690,18 +685,15 @@ class AddNewUserWindow(QDialog):
                 conn.close()
                 return
 
-
             c.execute("INSERT INTO Employees (name, second_name, email, role) VALUES (?, ?, ?, ?)",
                       (name, second_name, email, role))
             employee_id = c.lastrowid
-
 
             password_crypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             c.execute("INSERT INTO Users (login, password, employee_id, must_change_password) VALUES (?, ?, ?, ?)",
                       (login, password_crypted, employee_id, 1))
             conn.commit()
             conn.close()
-
 
             self.model.select()
             QMessageBox.information(self, "Sukces", "Użytkownik został dodany pomyślnie!")
@@ -714,7 +706,7 @@ class AddNewUserWindow(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
+    init_database()
     register_window = RegisterWindow(None)
     main_window = MainWindow(register_window=register_window, login_window=None)
     admin_window = AdminWindow(register_window=register_window, login_window=None)
