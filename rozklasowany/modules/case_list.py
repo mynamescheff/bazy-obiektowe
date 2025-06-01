@@ -8,7 +8,7 @@ class CaseList:
         self.excel_folder = excel_folder
         self.list_folder = list_folder
 
-    def process_excel_files(self):
+    def process_excel_files(self, text_widget_update):
         list_file_path = os.path.join(self.list_folder, "case_list.txt")
         existing_values = {}
         duplicate_counts = {}
@@ -33,7 +33,16 @@ class CaseList:
                         duplicate_counts[value] = duplicate_counts.get(value, 0) + 1
                         entry = f"case number: {value} [{file_name} - DUPLICATE {duplicate_counts[value]}]"
                         all_entries.append(entry)
-                        print(f"Duplicate found: {value} in file {file_name} (Duplicate count: {duplicate_counts[value]})")
+                        # Log the duplicate in the gui place in the app
+                        text_widget_update(f"Duplicate case number found: {value} in file {file_name}. Count: {duplicate_counts[value]}")
+                    elif value:
+                        existing_values[value] = True
+                        duplicate_counts[value] = 0
+                        entry = f"case number: {value} [{file_name}]"
+                        all_entries.append(entry)
+                        # Log the new case number in the gui place in the app
+                        text_widget_update(f"New case number added: {value} from file {file_name}.")
+
                     else:
                         existing_values[value] = False
                         duplicate_counts[value] = 0
@@ -58,8 +67,8 @@ class CaseList:
                 file.write(f"\n--- Updated on {today} ---\n")
                 for entry in all_entries:
                     file.write(f"{entry} ({today})\n")
-                            
-                print("Cases processed successfully and saved to the case_list.txt file.")
+
+                text_widget_update("Cases processed successfully and saved to the case_list.txt file.")
                 return duplicate_counts, error_messages
 
     def _clean_string(self, value):

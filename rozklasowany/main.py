@@ -10,6 +10,8 @@ from modules.outlook_processor import OutlookProcessor
 from modules.case_list import CaseList
 from utils.database_handler import DatabaseHandler, COMBINED_DB_PATH_FOR_VERIFICATION, BANK_ACC_DB_PATH_FOR_VERIFICATION
 from modules import relational_db_operations
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 
 class ExcelProcessorApp(QMainWindow):
     def __init__(self):
@@ -17,9 +19,32 @@ class ExcelProcessorApp(QMainWindow):
         self.setWindowTitle("Excel Processor Tool")
         self.setGeometry(100, 100, 850, 700)
 
+        # Initialize last directory
+        self.last_directory = os.path.dirname(os.path.abspath(__file__))
+        self.last_dir_path = ".\\rozklasowany\\last_dir"
+        self.last_dir_file = os.path.join(self.last_dir_path, "last_directory.txt")
+
+        # Create directory if it doesn't exist
+        if not os.path.exists(self.last_dir_path):
+            os.makedirs(self.last_dir_path)
+
+        # Load last directory from file
+        if os.path.exists(self.last_dir_file):
+            with open(self.last_dir_file, "r") as f:
+                self.last_directory = f.read().strip()
+
+        # if the last directory is empty, set it to the current directory where the script is located
+        if not self.last_directory:
+            self.last_directory = os.path.dirname(os.path.abspath(__file__))
+
+        # if the last directory is invalid, set it to the current directory where the script is located
+        if not os.path.exists(self.last_directory):
+            self.last_directory = os.path.dirname(os.path.abspath(__file__))
+
         # Status Bar
         self.status_bar = self.statusBar()
         self.status_bar.showMessage("Ready")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
         # Initialize Components
         self.excel_scraper = ExcelDataScraper()
@@ -280,9 +305,20 @@ class ExcelProcessorApp(QMainWindow):
     ### Utility Methods ###
 
     def browse_directory(self, line_edit):
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        # Use last_directory as the default directory for QFileDialog
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", self.last_directory)
         if directory:
             line_edit.setText(directory)
+            # Update last_directory and save to file
+            self.last_directory = directory
+            with open(self.last_dir_file, "w") as f:
+                f.write(self.last_directory)
+
+    def closeEvent(self, event):
+        # Save last directory when closing the app
+        with open(self.last_dir_file, "w") as f:
+            f.write(self.last_directory)
+        event.accept()
 
     def check_unread_emails(self):
         try:
@@ -295,9 +331,11 @@ class ExcelProcessorApp(QMainWindow):
             unread_count = processor.list_unread_emails()
             self.outlook_result_text.append(f"Found {unread_count} unread emails with category '{category}'.")
             self.status_bar.showMessage(f"Found {unread_count} unread emails")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
             self.outlook_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error checking emails")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def process_emails(self):
         try:
@@ -313,6 +351,7 @@ class ExcelProcessorApp(QMainWindow):
 
             self.outlook_result_text.append("Starting email processing...")
             self.status_bar.showMessage("Processing emails...")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
             def process_thread():
                 processor = OutlookProcessor(category, senders, attachment_path, msg_path)
@@ -326,6 +365,7 @@ class ExcelProcessorApp(QMainWindow):
         except Exception as e:
             self.outlook_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error processing emails")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def update_outlook_results(self, processor):
         self.outlook_result_text.append("Email processing completed.\n")
@@ -339,6 +379,7 @@ class ExcelProcessorApp(QMainWindow):
             for subject in processor.emails_with_nvf_new_vendor:
                 self.outlook_result_text.append(f"- {subject}\n")
         self.status_bar.showMessage("Email processing completed")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def process_case_list(self):
         try:
@@ -352,16 +393,52 @@ class ExcelProcessorApp(QMainWindow):
 
             self.case_list_result_text.append("Processing case list...")
             self.status_bar.showMessage("Processing case list...")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
             def process_thread():
                 case_list = CaseList(excel_folder, list_folder)
-                duplicate_counts, error_messages = case_list.process_excel_files()
-                QTimer.singleShot(0, lambda: self.update_case_list_results(duplicate_counts, error_messages))
+                duplicate_counts, error_messages = case_list.process_excel_files(text_widget_update=self.case_list_result_text.append)
+                # Capture the case list content
+                case_list_content = self.get_case_list_content(list_folder)
+                QTimer.singleShot(0, lambda: self.update_case_list_results(
+                    duplicate_counts, error_messages, case_list_content))
 
             threading.Thread(target=process_thread, daemon=True).start()
         except Exception as e:
             self.case_list_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error processing case list")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
+    def get_case_list_content(self, list_folder):
+        """Read and return the content of case_list.txt"""
+        list_file_path = os.path.join(list_folder, "case_list.txt")
+        if os.path.exists(list_file_path):
+            with open(list_file_path, "r", encoding="utf-8") as file:
+                return file.read()
+        return "No case list file found"
+
+    def update_case_list_results(self, duplicate_counts, error_messages, case_list_content):
+        self.case_list_result_text.append("Case list processing completed.\n")
+        duplicates = sum(1 for count in duplicate_counts.values() if count > 0)
+        self.case_list_result_text.append(f"Found {duplicates} duplicate cases.\n")
+        
+        if duplicates > 0:
+            self.case_list_result_text.append("\nDuplicate cases:\n")
+            for value, count in duplicate_counts.items():
+                if count > 0:
+                    self.case_list_result_text.append(f"- {value} (Duplicated {count} times)\n")
+        
+        if error_messages:
+            self.case_list_result_text.append("\nErrors encountered:\n")
+            for error in error_messages:
+                self.case_list_result_text.append(f"- {error}\n")
+        
+        # Show case list content
+        self.case_list_result_text.append("\nCase List Content:\n")
+        self.case_list_result_text.append(case_list_content)
+        
+        self.status_bar.showMessage("Case list processing completed")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def update_case_list_results(self, duplicate_counts, error_messages):
         self.case_list_result_text.append("Case list processing completed.\n")
@@ -377,9 +454,11 @@ class ExcelProcessorApp(QMainWindow):
             for error in error_messages:
                 self.case_list_result_text.append(f"- {error}\n")
         self.status_bar.showMessage("Case list processing completed")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def scrape_excel_files(self):
         try:
+            results, errors = [], []
             self.scrape_result_text.clear()
             directory = self.scrape_dir_entry.text()
             range_start = self.range_start_entry.text()
@@ -391,24 +470,61 @@ class ExcelProcessorApp(QMainWindow):
                 return
 
             self.scrape_result_text.append(f"Scraping Excel files in {directory}...")
+            if not os.path.exists(directory):
+                QMessageBox.critical(self, "Error", f"Directory '{directory}' does not exist.")
+                return
+            if not range_start or not range_end:
+                QMessageBox.critical(self, "Error", "Please specify a valid cell range.")
+                return
+            if not range_start[0].isalpha() or not range_end[0].isalpha():
+                QMessageBox.critical(self, "Error", "Cell range must start with a letter (e.g., A2).")
+                return
+            if not range_start[1:].isdigit() or not range_end[1:].isdigit():
+                QMessageBox.critical(self, "Error", "Cell range must end with a number (e.g., A2).")
+                return
+            if range_start[0] > range_end[0]:
+                QMessageBox.critical(self, "Error", "Start column must be before end column (e.g., A2 to G2).")
+                return
+            if int(range_start[1:]) > int(range_end[1:]):
+                QMessageBox.critical(self, "Error", "Start row must be before end row (e.g., A2 to G2).")
+                return
+            self.scrape_result_text.append(f"Scraping range: {range_start} to {range_end} (Read Headers: {read_headers})")
+            self.scrape_result_text.append("The files have been saved in the memory, please export them to CSV or Excel.")
             self.status_bar.showMessage("Scraping Excel files...")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
             self.excel_scraper.set_directory(directory)
+            
+            # Show a message box to let the user know scraping has ended
+            QMessageBox.information(self, "Scraping Complete", "Scraping complete. You can now export the data to CSV or Excel.")
 
             def scrape_thread():
-                results = self.excel_scraper.scrape_excel_files(range_start, range_end, read_headers)
-                QTimer.singleShot(0, lambda: self.update_scrape_results(results))
+                # Get both results and errors
+                results, errors = self.excel_scraper.scrape_excel_files(range_start, range_end, read_headers)
+                QTimer.singleShot(0, lambda: self.update_scrape_results(results, errors))
 
             threading.Thread(target=scrape_thread, daemon=True).start()
         except Exception as e:
             self.scrape_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error scraping Excel files")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
-    def update_scrape_results(self, results):
+    def update_scrape_results(self, results, errors):
         self.scrape_result_text.clear()
+        
+        # Show errors first
+        if errors:
+            self.scrape_result_text.append("Errors encountered:\n")
+            for error in errors:
+                self.scrape_result_text.append(f"- {error}\n")
+            self.scrape_result_text.append("\n")
+        
         self.scrape_result_text.append(f"Scraped {len(results)} Excel files.\n\n")
+        
         headers = self.excel_scraper.get_headers()
         if headers:
             self.scrape_result_text.append("Headers found: " + ", ".join(headers) + "\n\n")
+        
         if results:
             header_line = f"{'Filename':<30} | "
             if headers:
@@ -427,51 +543,63 @@ class ExcelProcessorApp(QMainWindow):
                     line += f"{str(value):<15} | "
                 self.scrape_result_text.append(line + "\n")
         self.status_bar.showMessage(f"Scraped {len(results)} Excel files")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def export_to_excel(self):
         try:
             if not self.excel_scraper.get_results():
                 QMessageBox.critical(self, "Error", "No data to export. Please scrape Excel files first.")
                 return
-            output_file, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+            output_file, _ = QFileDialog.getSaveFileName(self, "Save Excel File", self.last_directory, "Excel Files (*.xlsx);;All Files (*)")
             if not output_file:
                 return
+            self.last_directory = os.path.dirname(output_file)
             success = self.excel_scraper.save_results_to_excel(output_file)
             if success:
                 QMessageBox.information(self, "Success", f"Data exported to {output_file}")
                 self.status_bar.showMessage("Data exported to Excel")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+    
             else:
                 QMessageBox.critical(self, "Error", "Failed to export data")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Export error: {str(e)}")
             self.status_bar.showMessage("Error exporting data")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
 
     def export_to_csv(self):
         try:
             if not self.excel_scraper.get_results():
                 QMessageBox.critical(self, "Error", "No data to export. Please scrape Excel files first.")
                 return
-            output_file, _ = QFileDialog.getSaveFileName(self, "Save CSV File", "", "CSV Files (*.csv);;All Files (*)")
+            output_file, _ = QFileDialog.getSaveFileName(self, "Save CSV File", self.last_directory, "CSV Files (*.csv);;All Files (*)")
             if not output_file:
                 return
+            self.last_directory = os.path.dirname(output_file)
             success = self.excel_scraper.save_results_to_csv(output_file)
             if success:
                 QMessageBox.information(self, "Success", f"Data exported to {output_file}")
                 self.status_bar.showMessage("Data exported to CSV")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
             else:
                 QMessageBox.critical(self, "Error", "Failed to export data")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Export error: {str(e)}")
             self.status_bar.showMessage("Error exporting data")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def add_to_database(self):
         try:
             # Step 1: Select and convert .txt file
             txt_file_path, _ = QFileDialog.getOpenFileName(
-                self, "Select a .txt File", "", "Text Files (*.txt)"
+                self, "Select a .txt File", self.last_directory, "Text Files (*.txt)"
             )
             if txt_file_path:
+                self.last_directory = os.path.dirname(txt_file_path)
                 self.status_bar.showMessage("Converting .txt file to database...")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+    
                 try:
                     db_path = self.db_handler._convert_text_to_db(txt_file_path)
                     QMessageBox.information(
@@ -484,17 +612,24 @@ class ExcelProcessorApp(QMainWindow):
                         f"Failed to convert {os.path.basename(txt_file_path)}: {str(e)}"
                     )
                     self.status_bar.showMessage("Error converting .txt file")
+                    QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+        
                     return
             else:
                 self.status_bar.showMessage("TXT file selection canceled.")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+    
                 return
 
             # Step 2: Select and convert .xlsx file
             excel_file_path, _ = QFileDialog.getOpenFileName(
-                self, "Select an Excel File", "", "Excel Files (*.xlsx *.xls)"
+                self, "Select an Excel File", self.last_directory, "Excel Files (*.xlsx *.xls)"
             )
             if excel_file_path:
+                self.last_directory = os.path.dirname(excel_file_path)
                 self.status_bar.showMessage("Converting Excel file to database...")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+    
                 try:
                     db_path = self.db_handler._convert_excel_to_db(excel_file_path)
                     QMessageBox.information(
@@ -507,15 +642,23 @@ class ExcelProcessorApp(QMainWindow):
                         f"Failed to convert {os.path.basename(excel_file_path)}: {str(e)}"
                     )
                     self.status_bar.showMessage("Error converting Excel file")
+                    QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+        
                     return
             else:
                 self.status_bar.showMessage("Excel file selection canceled.")
+                QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+    
                 return
 
             self.status_bar.showMessage("File to DB conversion process complete.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Database error: {str(e)}")
             self.status_bar.showMessage("Error adding data to database")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
 
     ### Database Utilities Methods ###
 
@@ -526,6 +669,7 @@ class ExcelProcessorApp(QMainWindow):
         self.db_utils_result_text.clear()
         self._append_db_util_result("Attempting to verify bank accounts...")
         self.status_bar.showMessage("Verifying bank accounts...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         self.db_handler.verify_bank_accounts_in_combined_db()
         self._append_db_util_result("Bank account verification process finished. Check status bar and pop-up messages.")
 
@@ -533,22 +677,28 @@ class ExcelProcessorApp(QMainWindow):
         self.db_utils_result_text.clear()
         self._append_db_util_result(f"Attempting to set up/verify schema in '{relational_db_operations.PROJECT_DB_PATH}'...")
         self.status_bar.showMessage("Setting up project schema...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         try:
             relational_db_operations.setup_project_schema(relational_db_operations.PROJECT_DB_PATH)
             msg = f"Schema operation completed for {os.path.basename(relational_db_operations.PROJECT_DB_PATH)}."
             self._append_db_util_result(msg)
             QMessageBox.information(self, "Schema Setup", msg)
             self.status_bar.showMessage("Project schema setup complete.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
         except Exception as e:
             err_msg = f"Error during schema setup: {e}"
             self._append_db_util_result(err_msg)
             QMessageBox.critical(self, "Schema Error", err_msg)
             self.status_bar.showMessage("Error in schema setup.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
 
     def run_populate_project_data_from_combined_db(self):
         self.db_utils_result_text.clear()
         self._append_db_util_result(f"Attempting to populate '{relational_db_operations.PROJECT_DB_PATH}' from '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}'...")
         self.status_bar.showMessage("Populating project DB from Combined.db...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         try:
             if not os.path.exists(relational_db_operations.PROJECT_DB_PATH):
                 self._append_db_util_result(f"Database {relational_db_operations.PROJECT_DB_PATH} not found. Running schema setup first.")
@@ -563,16 +713,21 @@ class ExcelProcessorApp(QMainWindow):
             self._append_db_util_result(msg)
             QMessageBox.information(self, "Data Population", msg)
             self.status_bar.showMessage("Population from Combined.db complete.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
         except Exception as e:
             err_msg = f"Error during data population: {e}"
             self._append_db_util_result(err_msg)
             QMessageBox.critical(self, "Population Error", err_msg)
             self.status_bar.showMessage("Error in data population.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
+
 
     def run_display_users_with_bank_accounts(self):
         self.db_utils_result_text.clear()
         self._append_db_util_result(f"Fetching users with bank accounts from '{relational_db_operations.PROJECT_DB_PATH}'...")
         self.status_bar.showMessage("Fetching users with accounts...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         try:
             df = relational_db_operations.display_users_with_bank_accounts(relational_db_operations.PROJECT_DB_PATH, text_widget_update=self._append_db_util_result)
             if df is not None and not df.empty:
@@ -581,9 +736,11 @@ class ExcelProcessorApp(QMainWindow):
             elif df is not None and df.empty:
                 self._append_db_util_result("No users found with bank accounts linked to their cases.")
             self.status_bar.showMessage("Displayed users with accounts.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
             self._append_db_util_result(f"Error displaying users: {e}")
             self.status_bar.showMessage("Error displaying users.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def run_display_cases_for_university(self):
         self.db_utils_result_text.clear()
@@ -591,9 +748,11 @@ class ExcelProcessorApp(QMainWindow):
         if not uni_name:
             QMessageBox.critical(self, "Input Error", "Please select a University Name from the dropdown.")
             self.status_bar.showMessage("University not selected.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
             return
         self._append_db_util_result(f"Fetching cases for university '{uni_name}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
         self.status_bar.showMessage(f"Fetching cases for {uni_name}...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         try:
             df = relational_db_operations.display_all_cases_for_university(relational_db_operations.PROJECT_DB_PATH, uni_name, text_widget_update=self._append_db_util_result)
             if df is not None and not df.empty:
@@ -602,9 +761,11 @@ class ExcelProcessorApp(QMainWindow):
             elif df is not None and df.empty:
                 self._append_db_util_result(f"No cases found for university: '{uni_name}'")
             self.status_bar.showMessage(f"Displayed cases for {uni_name}.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
             self._append_db_util_result(f"Error displaying cases: {e}")
             self.status_bar.showMessage("Error displaying cases.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def run_display_university_for_case(self):
         self.db_utils_result_text.clear()
@@ -612,9 +773,11 @@ class ExcelProcessorApp(QMainWindow):
         if not case_num:
             QMessageBox.critical(self, "Input Error", "Please select a Case Number from the dropdown.")
             self.status_bar.showMessage("Case number not selected.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
             return
         self._append_db_util_result(f"Fetching university for case '{case_num}' from '{relational_db_operations.PROJECT_DB_PATH}'...")
         self.status_bar.showMessage(f"Fetching university for {case_num}...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         try:
             df = relational_db_operations.display_university_for_case(relational_db_operations.PROJECT_DB_PATH, case_num, text_widget_update=self._append_db_util_result)
             if df is not None and not df.empty:
@@ -623,12 +786,15 @@ class ExcelProcessorApp(QMainWindow):
             elif df is not None and df.empty:
                 self._append_db_util_result(f"No university found for case number: '{case_num}' (or case does not exist).")
             self.status_bar.showMessage(f"Displayed university for {case_num}.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
             self._append_db_util_result(f"Error displaying university: {e}")
             self.status_bar.showMessage("Error displaying university.")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def load_university_combo_data(self):
         self.status_bar.showMessage("Loading university list...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         self._append_db_util_result("Fetching unique universities from bank_acc_db.db...")
         uni_list = relational_db_operations.get_unique_universities_from_bank_acc_db(
             BANK_ACC_DB_PATH_FOR_VERIFICATION,
@@ -642,9 +808,11 @@ class ExcelProcessorApp(QMainWindow):
         else:
             self.db_uni_name_combo.setEnabled(False)
         self.status_bar.showMessage("University list loaded.")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def load_case_number_combo_data(self):
         self.status_bar.showMessage("Loading case number list...")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         self._append_db_util_result(f"Fetching unique case numbers from {os.path.basename(relational_db_operations.CASE_LIST_DB_PATH)}...")
         case_list = relational_db_operations.get_unique_case_numbers_from_case_list_db(
             relational_db_operations.CASE_LIST_DB_PATH,
@@ -658,6 +826,7 @@ class ExcelProcessorApp(QMainWindow):
         else:
             self.db_case_num_combo.setEnabled(False)
         self.status_bar.showMessage("Case number list loaded.")
+        QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -1,8 +1,7 @@
 import os
 import sqlite3
 import pandas as pd
-import tkinter as tk # Required for filedialog and messagebox if not already imported by main
-from tkinter import filedialog, messagebox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 # --- Constants for the verification function ---
 # User should ensure these files exist and are populated correctly.
@@ -13,71 +12,65 @@ COMBINED_DB_PATH_FOR_VERIFICATION = r".\\rozklasowany\\excelki\\cases\\combined\
 BANK_ACC_DB_PATH_FOR_VERIFICATION = r".\\rozklasowany\\excelki\\bank_acc_db.db"
 
 class DatabaseHandler:
-
     def __init__(self, status_var=None):
         self.status_var = status_var
 
     def _set_status(self, text: str):
-        if self.status_var is not None:
-            self.status_var.set(text)
-        print(f"Status: {text}") # Also print to console for non-GUI contexts
+        if self.status_var:
+            self.status_var(text)
+        print(f"Status: {text}")
 
     def add_to_database(self):
-        """
-        Ask user to pick a .txt file, convert it to .db,
-        then ask for an Excel file and convert it to .db.
-        This method uses filedialogs and is intended to be called from the GUI.
-        """
-        txt_file_path_selected = None 
-        excel_file_path_selected = None
-
-        # --- Process .txt file ---
-        txt_file_path = filedialog.askopenfilename(
-            title="Select a .txt file to convert to database",
-            filetypes=[("Text files", "*.txt")]
+        # Replace Tkinter file dialogs with PyQt
+        txt_file_path, _ = QFileDialog.getOpenFileName(
+            None, "Select a .txt file to convert to database", "", "Text files (*.txt)"
         )
+        
         if not txt_file_path:
             self._set_status("TXT file selection canceled.")
-            messagebox.showinfo("Operation Canceled", "No .txt file selected. Skipping .txt conversion.")
+            QMessageBox.information(None, "Operation Canceled", "No .txt file selected. Skipping .txt conversion.")
         else:
             txt_file_path_selected = txt_file_path
             try:
                 db_path_txt = self._convert_text_to_db(txt_file_path)
-                messagebox.showinfo(
+                QMessageBox.information(
+                    None,
                     "Success",
                     f"Converted {os.path.basename(txt_file_path)} -> {os.path.basename(db_path_txt)}"
                 )
                 self._set_status(f"TXT database saved as: {os.path.basename(db_path_txt)}")
             except Exception as e:
-                messagebox.showerror("Error converting TXT", str(e))
+                QMessageBox.critical(None, "Error converting TXT", str(e))
                 self._set_status(f"Error converting TXT: {e}")
             
         # --- Process Excel file ---
-        excel_file_path = filedialog.askopenfilename(
-            title="Select an Excel file to convert to database",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
+        excel_file_path, _ = QFileDialog.getOpenFileName(
+            None,
+            "Select an Excel file to convert to database",
+            "",
+            "Excel files (*.xlsx *.xls)"
         )
         if not excel_file_path:
             self._set_status("Excel file selection canceled.")
-            messagebox.showinfo("Operation Canceled", "No Excel file selected. Skipping Excel conversion.")
+            QMessageBox.information(None, "Operation Canceled", "No Excel file selected. Skipping Excel conversion.")
         else:
             excel_file_path_selected = excel_file_path
             try:
                 db_path_excel = self._convert_excel_to_db(excel_file_path)
-                messagebox.showinfo(
+                QMessageBox.information(
+                    None,
                     "Success",
                     f"Converted {os.path.basename(excel_file_path)} -> {os.path.basename(db_path_excel)}"
                 )
                 self._set_status(f"Excel database saved as: {os.path.basename(db_path_excel)}")
             except Exception as e:
-                messagebox.showerror("Error converting Excel", str(e))
+                QMessageBox.critical(None, "Error converting Excel", str(e))
                 self._set_status(f"Error converting Excel: {e}")
 
         if not txt_file_path_selected and not excel_file_path_selected:
             self._set_status("No files selected for conversion.")
         elif txt_file_path_selected or excel_file_path_selected:
-             self._set_status("File to DB conversion process complete. Check messages for details.")
-
+            self._set_status("File to DB conversion process complete. Check messages for details.")
 
     def _convert_text_to_db(self, txt_path: str) -> str:
         """
@@ -148,7 +141,7 @@ class DatabaseHandler:
             if not os.path.exists(BANK_ACC_DB_PATH_FOR_VERIFICATION):
                 msg = f"Error: Database '{BANK_ACC_DB_PATH_FOR_VERIFICATION}' not found at expected path."
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 return
 
             conn_bank_acc = sqlite3.connect(BANK_ACC_DB_PATH_FOR_VERIFICATION)
@@ -161,7 +154,7 @@ class DatabaseHandler:
             except Exception as e: 
                 msg = f"Error reading '{BANK_ACC_DB_PATH_FOR_VERIFICATION}': {e}"
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 conn_bank_acc.close()
                 return
             finally:
@@ -171,7 +164,7 @@ class DatabaseHandler:
                 msg = (f"Missing required columns in '{BANK_ACC_DB_PATH_FOR_VERIFICATION}'. "
                        f"Need: {', '.join(required_cols_bank_acc)}. Found: {', '.join(df_bank_acc.columns)}")
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 return
             
             bank_acc_set = set(zip(df_bank_acc['university'].astype(str), 
@@ -182,7 +175,7 @@ class DatabaseHandler:
             if not os.path.exists(COMBINED_DB_PATH_FOR_VERIFICATION):
                 msg = f"Error: Database '{COMBINED_DB_PATH_FOR_VERIFICATION}' not found at expected path."
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 return
 
             conn_combined = sqlite3.connect(COMBINED_DB_PATH_FOR_VERIFICATION)
@@ -195,7 +188,7 @@ class DatabaseHandler:
             except Exception as e:
                 msg = f"Error reading '{COMBINED_DB_PATH_FOR_VERIFICATION}': {e}"
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 conn_combined.close()
                 return
             finally:
@@ -205,13 +198,13 @@ class DatabaseHandler:
                 msg = (f"Missing required columns in '{COMBINED_DB_PATH_FOR_VERIFICATION}'. "
                        f"Need: {', '.join(required_cols_combined)}. Found: {', '.join(df_combined.columns)}")
                 self._set_status(msg)
-                messagebox.showerror("Verification Error", msg)
+                QMessageBox.critical(None, "Verification Error", msg)
                 return
 
             not_found_accounts_info = []
             if df_combined.empty:
                 self._set_status(f"{COMBINED_DB_PATH_FOR_VERIFICATION} is empty. No accounts to verify.")
-                messagebox.showinfo("Verification Info", f"The database '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}' is empty.")
+                QMessageBox.information(None, "Verification Info", f"The database '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}' is empty.")
                 return
 
             for index, row in df_combined.iterrows():
@@ -233,7 +226,7 @@ class DatabaseHandler:
                     result_message += f"\n\n...and {len(not_found_accounts_info) - 10} more. Check console for full list."
                 
                 self._set_status(f"Verification complete. {len(not_found_accounts_info)} accounts not found in {os.path.basename(BANK_ACC_DB_PATH_FOR_VERIFICATION)}.")
-                messagebox.showwarning("Verification Result", result_message)
+                QMessageBox.warning(None, "Verification Result", result_message)
                 print("\nFull list of accounts from combined.db not found in bank_acc_db.db:")
                 for acc_info_item in not_found_accounts_info:
                     print(f"- {acc_info_item}")
@@ -241,10 +234,10 @@ class DatabaseHandler:
                 msg = (f"All {len(df_combined)} bank account(s) from '{os.path.basename(COMBINED_DB_PATH_FOR_VERIFICATION)}' "
                        f"were found in '{os.path.basename(BANK_ACC_DB_PATH_FOR_VERIFICATION)}'.")
                 self._set_status(msg)
-                messagebox.showinfo("Verification Result", msg)
+                QMessageBox.information(None, "Verification Result", msg)
 
         except Exception as e:
             error_msg = f"An unexpected error occurred during verification: {e}"
             self._set_status(error_msg)
-            messagebox.showerror("Verification Error", error_msg)
+            QMessageBox.critical(None, "Verification Error", error_msg)
             print(f"ERROR: {error_msg}")

@@ -22,6 +22,7 @@ class ExcelDataScraper:
             
         self.results = []
         self.headers = []
+        errors = []  # Track errors per file
         
         # Extract column letters from range
         start_col = range_start[0]
@@ -73,10 +74,10 @@ class ExcelDataScraper:
                     
                     self.results.append(file_data)
                 except Exception as e:
-                    print(f"Error processing {filename}: {str(e)}")
-                    
-        return self.results
-    
+                    errors.append(f"{filename}: {str(e)}")
+
+        return self.results, errors
+
     def get_headers(self):
         return self.headers
     
