@@ -302,19 +302,23 @@ class ExcelProcessorApp(QMainWindow):
         event.accept()
 
     ### Outlook Processor Methods ###
-
+    
     def check_unread_emails(self):
         """Only checks for unread emails with Excel attachments (no download)"""
         try:
             self.outlook_result_text.clear()
-            excel_email_count = OutlookProcessor.check_unread_emails()
+            
+            # Create a callback function that appends to the result text
+            def output_callback(message):
+                self.outlook_result_text.append(message)
+                
+            excel_email_count = OutlookProcessor.check_unread_emails(output_callback=output_callback)
             
             if excel_email_count > 0:
                 message = f"Found {excel_email_count} unread email(s) with Excel attachments"
             else:
                 message = "No unread emails with Excel attachments found"
                 
-            self.outlook_result_text.append(message)
             self.status_bar.showMessage(message)
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
@@ -328,14 +332,25 @@ class ExcelProcessorApp(QMainWindow):
             self.outlook_result_text.clear()
             attachment_path = self.attachment_path_entry.text()
             mark_as_read = self.mark_as_read_check.isChecked()
+            
+            # Create a callback function that appends to the result text
+            def output_callback(message):
+                self.outlook_result_text.append(message)
 
             self.outlook_result_text.append("Starting email processing...")
             self.status_bar.showMessage("Processing emails...")
+            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
             
             def process_thread():
-                count = OutlookProcessor.download_xlsx_from_unread_emails(attachment_path)
+                count = OutlookProcessor.download_xlsx_from_unread_emails(
+                    attachment_path, 
+                    output_callback=output_callback
+                )
                 if mark_as_read:
-                    OutlookProcessor.mark_emails_as_read(True)
+                    OutlookProcessor.mark_emails_as_read(
+                        True, 
+                        output_callback=output_callback
+                    )
                 QTimer.singleShot(0, lambda: self.update_outlook_results_simple(count, mark_as_read))
             
             threading.Thread(target=process_thread, daemon=True).start()

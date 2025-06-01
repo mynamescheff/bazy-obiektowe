@@ -1,75 +1,51 @@
+# outlook_processor.py (modified)
 import os
 import win32com.client
 from datetime import datetime
-import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 class OutlookProcessor:
     @staticmethod
-    def check_unread_emails():
-        """Checks for unread emails with Excel attachments without downloading them"""
-        try:
-            # Connect to Outlook
-            outlook = win32com.client.Dispatch("Outlook.Application")
-            namespace = outlook.GetNamespace("MAPI")
-            inbox = namespace.GetDefaultFolder(6)  # Inbox
-            unread_emails = inbox.Items.Restrict("[Unread] = True")
-            
-            excel_email_count = 0
-            
-            for email in unread_emails:
-                try:
-                    if email.Attachments.Count > 0:
-                        for attachment in email.Attachments:
-                            if attachment.FileName.lower().endswith('.xlsx'):
-                                excel_email_count += 1
-                                break  # Count each email only once
-                except Exception:
-                    continue
-                    
-            return excel_email_count
-        except Exception as e:
-            logger.error(f"Error accessing Outlook: {str(e)}")
-            return 0
-    
-    def download_xlsx_from_unread_emails(download_folder="./rozklasowany/outlook"):
+    def download_xlsx_from_unread_emails(download_folder="./rozklasowany/outlook", output_callback=None):
         """
         Downloads .xlsx files from unread emails in Outlook
         
         Args:
             download_folder (str): Folder where files will be saved
+            output_callback (function): Callback function to output messages
         """
         try:
+            # Create output callback if not provided
+            if output_callback is None:
+                output_callback = print
+            
             # Create download folder if it doesn't exist
             if not os.path.exists(download_folder):
                 os.makedirs(download_folder)
-                logger.info(f"Created download folder: {download_folder}")
+                output_callback(f"Created download folder: {download_folder}")
             
             # Connect to Outlook
-            logger.info("Connecting to Outlook...")
+            output_callback("Connecting to Outlook...")
             outlook = win32com.client.Dispatch("Outlook.Application")
             namespace = outlook.GetNamespace("MAPI")
             
             # Get the inbox folder
             inbox = namespace.GetDefaultFolder(6)  # 6 = olFolderInbox
-            logger.info("Connected to Outlook inbox")
+            output_callback("Connected to Outlook inbox")
             
             # Get unread emails
             unread_emails = inbox.Items.Restrict("[Unread] = True")
-            logger.info(f"Found {unread_emails.Count} unread emails")
+            output_callback(f"Found {unread_emails.Count} unread emails")
             
             downloaded_count = 0
             
             # Process each unread email
             for email in unread_emails:
                 try:
-                    logger.info(f"Processing email: {email.Subject}")
+                    output_callback(f"Processing email: {email.Subject}")
                     
                     # Check if email has attachments
                     if email.Attachments.Count > 0:
-                        logger.info(f"  Found {email.Attachments.Count} attachments")
+                        output_callback(f"  Found {email.Attachments.Count} attachments")
                         
                         # Process each attachment
                         for attachment in email.Attachments:
@@ -93,38 +69,44 @@ class OutlookProcessor:
                                 attachment.SaveAsFile(filepath)
                                 downloaded_count += 1
                                 
-                                logger.info(f"  Downloaded: {safe_filename}")
-                                logger.info(f"    From: {email.SenderName}")
-                                logger.info(f"    Subject: {email.Subject}")
-                                logger.info(f"    Received: {email.ReceivedTime}")
+                                output_callback(f"  Downloaded: {safe_filename}")
+                                output_callback(f"    From: {email.SenderName}")
+                                output_callback(f"    Subject: {email.Subject}")
+                                output_callback(f"    Received: {email.ReceivedTime}")
                                 
                             else:
-                                logger.info(f"  Skipping non-Excel file: {filename}")
+                                output_callback(f"  Skipping non-Excel file: {filename}")
                     else:
-                        logger.info("  No attachments found")
+                        output_callback("  No attachments found")
                         
                 except Exception as e:
-                    logger.error(f"Error processing email '{email.Subject}': {str(e)}")
+                    output_callback(f"Error processing email '{email.Subject}': {str(e)}")
                     continue
             
-            logger.info(f"Download complete! Downloaded {downloaded_count} Excel files to '{download_folder}'")
+            output_callback(f"Download complete! Downloaded {downloaded_count} Excel files to '{download_folder}'")
             return downloaded_count
             
         except Exception as e:
-            logger.error(f"Error accessing Outlook: {str(e)}")
+            output_callback(f"Error accessing Outlook: {str(e)}")
             return 0
 
-    def mark_emails_as_read(mark_read=False):
+    @staticmethod
+    def mark_emails_as_read(mark_read=False, output_callback=None):
         """
         Optional: Mark processed emails as read
         
         Args:
             mark_read (bool): Whether to mark emails as read after processing
+            output_callback (function): Callback function to output messages
         """
         if not mark_read:
             return
             
         try:
+            # Create output callback if not provided
+            if output_callback is None:
+                output_callback = print
+                
             outlook = win32com.client.Dispatch("Outlook.Application")
             namespace = outlook.GetNamespace("MAPI")
             inbox = namespace.GetDefaultFolder(6)
@@ -135,19 +117,52 @@ class OutlookProcessor:
                     for attachment in email.Attachments:
                         if attachment.FileName.lower().endswith('.xlsx'):
                             email.UnRead = False
-                            logger.info(f"Marked as read: {email.Subject}")
+                            output_callback(f"Marked as read: {email.Subject}")
                             break
                             
         except Exception as e:
-            logger.error(f"Error marking emails as read: {str(e)}")
+            output_callback(f"Error marking emails as read: {str(e)}")
+
+    @staticmethod
+    def check_unread_emails(output_callback=None):
+        """Checks for unread emails with Excel attachments without downloading them"""
+        try:
+            # Create output callback if not provided
+            if output_callback is None:
+                output_callback = print
+                
+            # Connect to Outlook
+            output_callback("Connecting to Outlook to check unread emails...")
+            outlook = win32com.client.Dispatch("Outlook.Application")
+            namespace = outlook.GetNamespace("MAPI")
+            inbox = namespace.GetDefaultFolder(6)  # Inbox
+            unread_emails = inbox.Items.Restrict("[Unread] = True")
+            
+            excel_email_count = 0
+            
+            for email in unread_emails:
+                try:
+                    if email.Attachments.Count > 0:
+                        for attachment in email.Attachments:
+                            if attachment.FileName.lower().endswith('.xlsx'):
+                                excel_email_count += 1
+                                break  # Count each email only once
+                except Exception:
+                    continue
+                    
+            output_callback(f"Found {excel_email_count} unread emails with Excel attachments")
+            return excel_email_count
+        except Exception as e:
+            output_callback(f"Error accessing Outlook: {str(e)}")
+            return 0
 
     if __name__ == "__main__":
         print("Outlook Excel File Downloader")
         print("=" * 50)
         
         # Configuration
-        DOWNLOAD_FOLDER = "downloaded_excel_files"  # Change this to your preferred folder
-        MARK_AS_READ = False  # Set to True if you want to mark emails as read after downloading
+        DOWNLOAD_FOLDER = "downloaded_excel_files"
+        MARK_AS_READ = False
         
         # Run the download process
         try:
