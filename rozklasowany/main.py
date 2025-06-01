@@ -81,17 +81,12 @@ class ExcelProcessorApp(QMainWindow):
 
         # Email Category
         self.category_entry = QLineEdit()
-        self.category_entry.setText("Approval")
+        self.category_entry.setText("")
         form_layout.addRow("Email Category:", self.category_entry)
-
-        # Target Senders
-        self.senders_entry = QLineEdit()
-        self.senders_entry.setText("Sender1,Sender2")
-        form_layout.addRow("Target Senders (comma-separated):", self.senders_entry)
 
         # Attachments Save Path
         self.attachment_path_entry = QLineEdit()
-        self.attachment_path_entry.setText("C:/Attachments")
+        self.attachment_path_entry.setText("./rozklasowany/outlook")
         attachment_path_button = QPushButton("Browse")
         attachment_path_button.clicked.connect(lambda: self.browse_directory(self.attachment_path_entry))
         attachment_layout = QHBoxLayout()
@@ -99,24 +94,10 @@ class ExcelProcessorApp(QMainWindow):
         attachment_layout.addWidget(attachment_path_button)
         form_layout.addRow("Attachments Save Path:", attachment_layout)
 
-        # Messages Save Path
-        self.msg_path_entry = QLineEdit()
-        self.msg_path_entry.setText("C:/Messages")
-        msg_path_button = QPushButton("Browse")
-        msg_path_button.clicked.connect(lambda: self.browse_directory(self.msg_path_entry))
-        msg_layout = QHBoxLayout()
-        msg_layout.addWidget(self.msg_path_entry)
-        msg_layout.addWidget(msg_path_button)
-        form_layout.addRow("Messages Save Path:", msg_layout)
-
         # Checkboxes
         self.mark_as_read_check = QCheckBox("Mark emails as read")
         self.mark_as_read_check.setChecked(True)
         form_layout.addRow(self.mark_as_read_check)
-
-        self.save_emails_check = QCheckBox("Save emails")
-        self.save_emails_check.setChecked(True)
-        form_layout.addRow(self.save_emails_check)
 
         layout.addLayout(form_layout)
 
@@ -320,64 +301,54 @@ class ExcelProcessorApp(QMainWindow):
             f.write(self.last_directory)
         event.accept()
 
+    ### Outlook Processor Methods ###
+
     def check_unread_emails(self):
+        """Only checks for unread emails with Excel attachments (no download)"""
         try:
             self.outlook_result_text.clear()
-            category = self.category_entry.text()
-            if not category:
-                QMessageBox.critical(self, "Error", "Please enter an email category.")
-                return
-            processor = OutlookProcessor(category, [], "", "")
-            unread_count = processor.list_unread_emails()
-            self.outlook_result_text.append(f"Found {unread_count} unread emails with category '{category}'.")
-            self.status_bar.showMessage(f"Found {unread_count} unread emails")
+            excel_email_count = OutlookProcessor.check_unread_emails()
+            
+            if excel_email_count > 0:
+                message = f"Found {excel_email_count} unread email(s) with Excel attachments"
+            else:
+                message = "No unread emails with Excel attachments found"
+                
+            self.outlook_result_text.append(message)
+            self.status_bar.showMessage(message)
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
         except Exception as e:
             self.outlook_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error checking emails")
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
-
+    
     def process_emails(self):
+        """Downloads attachments and marks as read (existing functionality)"""
         try:
             self.outlook_result_text.clear()
-            category = self.category_entry.text()
-            senders = [s.strip() for s in self.senders_entry.text().split(",") if s.strip()]
             attachment_path = self.attachment_path_entry.text()
-            msg_path = self.msg_path_entry.text()
-
-            if not all([category, senders, attachment_path, msg_path]):
-                QMessageBox.critical(self, "Error", "Please fill in all required fields.")
-                return
+            mark_as_read = self.mark_as_read_check.isChecked()
 
             self.outlook_result_text.append("Starting email processing...")
             self.status_bar.showMessage("Processing emails...")
-            QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
-
+            
             def process_thread():
-                processor = OutlookProcessor(category, senders, attachment_path, msg_path)
-                processor.download_attachments_and_save_as_msg(
-                    self.save_emails_check.isChecked(),
-                    self.mark_as_read_check.isChecked()
-                )
-                QTimer.singleShot(0, lambda: self.update_outlook_results(processor))
-
+                count = OutlookProcessor.download_xlsx_from_unread_emails(attachment_path)
+                if mark_as_read:
+                    OutlookProcessor.mark_emails_as_read(True)
+                QTimer.singleShot(0, lambda: self.update_outlook_results_simple(count, mark_as_read))
+            
             threading.Thread(target=process_thread, daemon=True).start()
         except Exception as e:
             self.outlook_result_text.append(f"Error: {str(e)}")
             self.status_bar.showMessage("Error processing emails")
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
-    def update_outlook_results(self, processor):
+    def update_outlook_results_simple(self, count, marked):
         self.outlook_result_text.append("Email processing completed.\n")
-        self.outlook_result_text.append(f"Emails processed: {len(processor.processed_emails)}\n")
-        if processor.emails_with_pdf:
-            self.outlook_result_text.append("\nEmails with PDF attachments:\n")
-            for subject in processor.emails_with_pdf:
-                self.outlook_result_text.append(f"- {subject}\n")
-        if processor.emails_with_nvf_new_vendor:
-            self.outlook_result_text.append("\nEmails with NVF or New Vendor attachments:\n")
-            for subject in processor.emails_with_nvf_new_vendor:
-                self.outlook_result_text.append(f"- {subject}\n")
+        self.outlook_result_text.append(f"Excel files downloaded: {count}\n")
+        if marked:
+            self.outlook_result_text.append("Processed emails marked as read.\n")
         self.status_bar.showMessage("Email processing completed")
         QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
