@@ -89,6 +89,7 @@ class ExcelProcessorApp(QMainWindow):
         self.setup_db_utils_tab()
 
         self.add_help_icon()
+        QTimer.singleShot(100, self.show_help_message)
 
     def add_help_icon(self):
         info_button = QPushButton()
@@ -105,7 +106,13 @@ class ExcelProcessorApp(QMainWindow):
         self.statusBar().addPermanentWidget(info_widget)
 
     def show_help_message(self):
-        QMessageBox.information(self, "How to Use Excel Processor Tool", self.HELP_MESSAGE)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("How to Use Excel Processor Tool")
+        msg_box.setText(self.HELP_MESSAGE)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.setEscapeButton(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     def setup_outlook_tab(self):
         layout = QVBoxLayout()
