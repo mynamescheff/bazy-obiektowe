@@ -26,21 +26,18 @@ class CaseList:
                     sheet = wb.active
                     value = sheet["G2"].value
                     if value:
-                        # Clean the value
                         value = self._clean_string(value)
                         
                     if value in existing_values:
                         duplicate_counts[value] = duplicate_counts.get(value, 0) + 1
                         entry = f"case number: {value} [{file_name} - DUPLICATE {duplicate_counts[value]}]"
                         all_entries.append(entry)
-                        # Log the duplicate in the gui place in the app
                         text_widget_update(f"Duplicate case number found: {value} in file {file_name}. Count: {duplicate_counts[value]}")
                     elif value:
                         existing_values[value] = True
                         duplicate_counts[value] = 0
                         entry = f"case number: {value} [{file_name}]"
                         all_entries.append(entry)
-                        # Log the new case number in the gui place in the app
                         text_widget_update(f"New case number added: {value} from file {file_name}.")
 
                     else:
@@ -53,16 +50,13 @@ class CaseList:
                     
         if all_entries:
             today = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Ensure the directory exists
+
             os.makedirs(os.path.dirname(list_file_path), exist_ok=True)
-            
-            # Create the file if it doesn't exist
+
             if not os.path.exists(list_file_path):
                 with open(list_file_path, "w", encoding="utf-8") as file:
                     file.write(f"--- Case List Created on {today} ---\n")
-            
-            # Append the new entries
+
             with open(list_file_path, "a", encoding="utf-8") as file:
                 file.write(f"\n--- Updated on {today} ---\n")
                 for entry in all_entries:
@@ -77,12 +71,10 @@ class CaseList:
             
         value = str(value)
         value = re.sub(r'[\n\r\t\v\f\x85\u2028\u2029]+', ' ', value)
-        
-        # Remove extra spaces
+
         while "  " in value:
             value = value.replace("  ", " ")
-            
-        # Make sure string ends with alphanumeric character
+
         while value and not value[-1].isalnum():
             value = value[:-1]
             

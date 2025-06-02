@@ -14,47 +14,65 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 class ExcelProcessorApp(QMainWindow):
+    HELP_MESSAGE = (
+        "Excel Processor Tool - User Guide\n\n"
+        "1. Outlook Processor Tab:\n"
+        "   - Set the folder to save Excel attachments from unread Outlook emails.\n"
+        "   - Click 'Check Unread Emails' to see how many unread emails with Excel attachments you have.\n"
+        "   - Click 'Process Emails' to download all Excel attachments from unread emails. Optionally mark them as read.\n\n"
+        "2. Case List Tab:\n"
+        "   - Select the folder with Excel files and the output folder for the case list.\n"
+        "   - Click 'Process Case List' to extract case numbers from Excel files and save them to a text file.\n\n"
+        "3. Excel Scraper Tab:\n"
+        "   - Select the directory with Excel files to scrape.\n"
+        "   - Set the cell range to read (e.g., A2 to G2).\n"
+        "   - Click 'Scrape Excel Files' to load data into memory.\n"
+        "   - Export results to Excel or CSV using the provided buttons.\n"
+        "   - Use 'Files to DB' to convert .txt or .xlsx files to a database.\n\n"
+        "4. Database Utilities Tab:\n"
+        "   - Verify bank accounts between combined and bank account databases.\n"
+        "   - Setup or verify the project database schema.\n"
+        "   - Populate the project database from the combined database.\n"
+        "   - Query cases by university or university by case number.\n"
+        "   - Show all users with bank accounts linked to cases.\n\n"
+        "General Tips:\n"
+        "- Use the 'Browse' buttons to select folders or files.\n"
+        "- Status messages and results are shown at the bottom of each tab.\n"
+        "- For best results, ensure all required files exist and are formatted as expected.\n"
+        "- For further help, click this info icon anytime."
+    )
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Excel Processor Tool")
         self.setGeometry(100, 100, 850, 700)
 
-        # Initialize last directory
         self.last_directory = os.path.dirname(os.path.abspath(__file__))
         self.last_dir_path = ".\\rozklasowany\\last_dir"
         self.last_dir_file = os.path.join(self.last_dir_path, "last_directory.txt")
 
-        # Create directory if it doesn't exist
         if not os.path.exists(self.last_dir_path):
             os.makedirs(self.last_dir_path)
 
-        # Load last directory from file
         if os.path.exists(self.last_dir_file):
             with open(self.last_dir_file, "r") as f:
                 self.last_directory = f.read().strip()
 
-        # if the last directory is empty, set it to the current directory where the script is located
         if not self.last_directory:
             self.last_directory = os.path.dirname(os.path.abspath(__file__))
 
-        # if the last directory is invalid, set it to the current directory where the script is located
         if not os.path.exists(self.last_directory):
             self.last_directory = os.path.dirname(os.path.abspath(__file__))
 
-        # Status Bar
         self.status_bar = self.statusBar()
         self.status_bar.showMessage("Ready")
         QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
-        # Initialize Components
         self.excel_scraper = ExcelDataScraper()
-        self.db_handler = DatabaseHandler(status_var=None)  # Status handled via status_bar
+        self.db_handler = DatabaseHandler(status_var=None)  
 
-        # Tab Widget
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
 
-        # Create Tabs
         self.outlook_tab = QWidget()
         self.case_list_tab = QWidget()
         self.scrape_tab = QWidget()
@@ -65,26 +83,39 @@ class ExcelProcessorApp(QMainWindow):
         self.tab_widget.addTab(self.scrape_tab, "Excel Scraper")
         self.tab_widget.addTab(self.db_utils_tab, "Database Utilities")
 
-        # Setup Tabs
         self.setup_outlook_tab()
         self.setup_case_list_tab()
         self.setup_scrape_tab()
         self.setup_db_utils_tab()
 
-    ### Tab Setup Methods ###
+        self.add_help_icon()
+
+    def add_help_icon(self):
+        info_button = QPushButton()
+        info_button.setIcon(QIcon.fromTheme("help-about"))
+        info_button.setToolTip("Show instructions")
+        info_button.setFixedSize(28, 28)
+        info_button.clicked.connect(self.show_help_message)
+
+        info_layout = QHBoxLayout()
+        info_layout.addStretch()
+        info_layout.addWidget(info_button)
+        info_widget = QWidget()
+        info_widget.setLayout(info_layout)
+        self.statusBar().addPermanentWidget(info_widget)
+
+    def show_help_message(self):
+        QMessageBox.information(self, "How to Use Excel Processor Tool", self.HELP_MESSAGE)
 
     def setup_outlook_tab(self):
         layout = QVBoxLayout()
 
-        # Form Layout for Inputs
         form_layout = QFormLayout()
 
-        # Email Category
         self.category_entry = QLineEdit()
         self.category_entry.setText("")
         form_layout.addRow("Email Category:", self.category_entry)
 
-        # Attachments Save Path
         self.attachment_path_entry = QLineEdit()
         self.attachment_path_entry.setText("./rozklasowany/outlook")
         attachment_path_button = QPushButton("Browse")
@@ -94,14 +125,12 @@ class ExcelProcessorApp(QMainWindow):
         attachment_layout.addWidget(attachment_path_button)
         form_layout.addRow("Attachments Save Path:", attachment_layout)
 
-        # Checkboxes
         self.mark_as_read_check = QCheckBox("Mark emails as read")
         self.mark_as_read_check.setChecked(True)
         form_layout.addRow(self.mark_as_read_check)
 
         layout.addLayout(form_layout)
 
-        # Buttons
         buttons_layout = QHBoxLayout()
         check_unread_button = QPushButton("Check Unread Emails")
         check_unread_button.clicked.connect(self.check_unread_emails)
@@ -111,7 +140,6 @@ class ExcelProcessorApp(QMainWindow):
         buttons_layout.addWidget(process_emails_button)
         layout.addLayout(buttons_layout)
 
-        # Results Display
         layout.addWidget(QLabel("Processing Results:"))
         self.outlook_result_text = QTextEdit()
         self.outlook_result_text.setReadOnly(True)
@@ -122,10 +150,8 @@ class ExcelProcessorApp(QMainWindow):
     def setup_case_list_tab(self):
         layout = QVBoxLayout()
 
-        # Form Layout for Inputs
         form_layout = QFormLayout()
 
-        # Excel Files Folder
         self.excel_folder_entry = QLineEdit()
         excel_folder_button = QPushButton("Browse")
         excel_folder_button.clicked.connect(lambda: self.browse_directory(self.excel_folder_entry))
@@ -134,7 +160,6 @@ class ExcelProcessorApp(QMainWindow):
         excel_folder_layout.addWidget(excel_folder_button)
         form_layout.addRow("Excel Files Folder:", excel_folder_layout)
 
-        # List Output Folder
         self.list_folder_entry = QLineEdit()
         list_folder_button = QPushButton("Browse")
         list_folder_button.clicked.connect(lambda: self.browse_directory(self.list_folder_entry))
@@ -145,12 +170,10 @@ class ExcelProcessorApp(QMainWindow):
 
         layout.addLayout(form_layout)
 
-        # Button
         process_case_list_button = QPushButton("Process Case List")
         process_case_list_button.clicked.connect(self.process_case_list)
         layout.addWidget(process_case_list_button)
 
-        # Results Display
         layout.addWidget(QLabel("Processing Results:"))
         self.case_list_result_text = QTextEdit()
         self.case_list_result_text.setReadOnly(True)
@@ -161,7 +184,6 @@ class ExcelProcessorApp(QMainWindow):
     def setup_scrape_tab(self):
         layout = QVBoxLayout()
 
-        # Excel Files Directory
         self.scrape_dir_entry = QLineEdit()
         scrape_dir_button = QPushButton("Browse")
         scrape_dir_button.clicked.connect(lambda: self.browse_directory(self.scrape_dir_entry))
@@ -171,7 +193,6 @@ class ExcelProcessorApp(QMainWindow):
         layout.addWidget(QLabel("Excel Files Directory:"))
         layout.addLayout(scrape_dir_layout)
 
-        # Range Selection
         range_layout = QHBoxLayout()
         range_layout.addWidget(QLabel("Cell Range:"))
         range_layout.addWidget(QLabel("From:"))
@@ -184,12 +205,10 @@ class ExcelProcessorApp(QMainWindow):
         range_layout.addWidget(self.range_end_entry)
         layout.addLayout(range_layout)
 
-        # Read Headers Checkbox
         self.read_headers_check = QCheckBox("Read headers from first row")
         self.read_headers_check.setChecked(True)
         layout.addWidget(self.read_headers_check)
 
-        # Buttons
         buttons_layout = QHBoxLayout()
         scrape_button = QPushButton("Scrape Excel Files")
         scrape_button.clicked.connect(self.scrape_excel_files)
@@ -205,7 +224,6 @@ class ExcelProcessorApp(QMainWindow):
         buttons_layout.addWidget(files_to_db_button)
         layout.addLayout(buttons_layout)
 
-        # Results Display
         layout.addWidget(QLabel("Scraped Data:"))
         self.scrape_result_text = QTextEdit()
         self.scrape_result_text.setReadOnly(True)
@@ -216,7 +234,6 @@ class ExcelProcessorApp(QMainWindow):
     def setup_db_utils_tab(self):
         layout = QVBoxLayout()
 
-        # Bank Account Verification Section
         verify_group = QGroupBox("Bank Account Verification")
         verify_layout = QVBoxLayout()
         verify_desc = (f"Checks bank accounts from:\n'{os.path.abspath(COMBINED_DB_PATH_FOR_VERIFICATION)}'\n"
@@ -231,11 +248,9 @@ class ExcelProcessorApp(QMainWindow):
         verify_group.setLayout(verify_layout)
         layout.addWidget(verify_group)
 
-        # Relational Database Project Section
         project_group = QGroupBox(f"Relational Project Database ({os.path.basename(relational_db_operations.PROJECT_DB_PATH)})")
         project_layout = QVBoxLayout()
 
-        # Setup Buttons
         setup_layout = QHBoxLayout()
         setup_schema_button = QPushButton("Setup/Verify Project Schema")
         setup_schema_button.clicked.connect(self.run_setup_project_schema)
@@ -245,7 +260,6 @@ class ExcelProcessorApp(QMainWindow):
         setup_layout.addWidget(populate_db_button)
         project_layout.addLayout(setup_layout)
 
-        # Query Section
         query_layout = QFormLayout()
         self.db_uni_name_combo = QComboBox()
         self.db_uni_name_combo.setEditable(False)
@@ -275,7 +289,6 @@ class ExcelProcessorApp(QMainWindow):
         project_group.setLayout(project_layout)
         layout.addWidget(project_group)
 
-        # Results Display
         layout.addWidget(QLabel("Output / Results (also check console):"))
         self.db_utils_result_text = QTextEdit()
         self.db_utils_result_text.setReadOnly(True)
@@ -283,31 +296,23 @@ class ExcelProcessorApp(QMainWindow):
 
         self.db_utils_tab.setLayout(layout)
 
-    ### Utility Methods ###
-
     def browse_directory(self, line_edit):
-        # Use last_directory as the default directory for QFileDialog
         directory = QFileDialog.getExistingDirectory(self, "Select Directory", self.last_directory)
         if directory:
             line_edit.setText(directory)
-            # Update last_directory and save to file
             self.last_directory = directory
             with open(self.last_dir_file, "w") as f:
                 f.write(self.last_directory)
 
     def closeEvent(self, event):
-        # Save last directory when closing the app
         with open(self.last_dir_file, "w") as f:
             f.write(self.last_directory)
         event.accept()
-
-    ### Outlook Processor Methods ###
     
     def check_unread_emails(self):
         try:
             self.outlook_result_text.clear()
             
-            # Create a callback function that appends to the result text
             def output_callback(message):
                 self.outlook_result_text.append(message)
                 
@@ -331,7 +336,6 @@ class ExcelProcessorApp(QMainWindow):
             attachment_path = self.attachment_path_entry.text()
             mark_as_read = self.mark_as_read_check.isChecked()
             
-            # Create a callback function that appends to the result text
             def output_callback(message):
                 self.outlook_result_text.append(message)
 
@@ -382,7 +386,6 @@ class ExcelProcessorApp(QMainWindow):
             def process_thread():
                 case_list = CaseList(excel_folder, list_folder)
                 duplicate_counts, error_messages = case_list.process_excel_files(text_widget_update=self.case_list_result_text.append)
-                # Capture the case list content
                 case_list_content = self.get_case_list_content(list_folder)
                 QTimer.singleShot(0, lambda: self.update_case_list_results(
                     duplicate_counts, error_messages, case_list_content))
@@ -416,7 +419,6 @@ class ExcelProcessorApp(QMainWindow):
             for error in error_messages:
                 self.case_list_result_text.append(f"- {error}\n")
         
-        # Show case list content
         self.case_list_result_text.append("\nCase List Content:\n")
         self.case_list_result_text.append(case_list_content)
         
@@ -478,11 +480,9 @@ class ExcelProcessorApp(QMainWindow):
 
             self.excel_scraper.set_directory(directory)
             
-            # Show a message box to let the user know scraping has ended
             QMessageBox.information(self, "Scraping Complete", "Scraping complete. You can now export the data to CSV or Excel.")
 
             def scrape_thread():
-                # Get both results and errors
                 results, errors = self.excel_scraper.scrape_excel_files(range_start, range_end, read_headers)
                 QTimer.singleShot(0, lambda: self.update_scrape_results(results, errors))
 
@@ -495,7 +495,6 @@ class ExcelProcessorApp(QMainWindow):
     def update_scrape_results(self, results, errors):
         self.scrape_result_text.clear()
         
-        # Show errors first
         if errors:
             self.scrape_result_text.append("Errors encountered:\n")
             for error in errors:
@@ -574,7 +573,6 @@ class ExcelProcessorApp(QMainWindow):
 
     def add_to_database(self):
         try:
-            # Step 1: Select and convert .txt file
             txt_file_path, _ = QFileDialog.getOpenFileName(
                 self, "Select a .txt File", self.last_directory, "Text Files (*.txt)"
             )
@@ -604,7 +602,6 @@ class ExcelProcessorApp(QMainWindow):
     
                 return
 
-            # Step 2: Select and convert .xlsx file
             excel_file_path, _ = QFileDialog.getOpenFileName(
                 self, "Select an Excel File", self.last_directory, "Excel Files (*.xlsx *.xls)"
             )
@@ -642,8 +639,6 @@ class ExcelProcessorApp(QMainWindow):
             self.status_bar.showMessage("Error adding data to database")
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
-
-    ### Database Utilities Methods ###
 
     def _append_db_util_result(self, message):
         self.db_utils_result_text.append(str(message))

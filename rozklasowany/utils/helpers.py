@@ -17,7 +17,6 @@ def transform_to_swift_accepted_characters(self, text_list):
     result = []
     for text in text_list:
         if text:
-            # Remove potentially problematic characters
             clean_text = re.sub(r'[\/:*?"<>|\t]', ' ', str(text))
             result.append(clean_text)
         else:

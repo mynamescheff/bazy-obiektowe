@@ -37,7 +37,6 @@ class DatabaseHandler:
                 QMessageBox.critical(None, "Error converting TXT", str(e))
                 self._set_status(f"Error converting TXT: {e}")
             
-        # --- Process Excel file ---
         excel_file_path, _ = QFileDialog.getOpenFileName(
             None,
             "Select an Excel file to convert to database",
@@ -74,10 +73,8 @@ class DatabaseHandler:
         records = []
         for line in lines:
             if line.lower().startswith('case number: '):
-                # strip off the leading "case number:" and split
                 content = line.strip()[len('case number: '):].strip()
                 parts = content.split()
-                # need at least two parts: case_number and filename
                 if len(parts) >= 2:
                     case_number = parts[0]
                     filename = parts[1].strip('[]')
@@ -115,7 +112,6 @@ class DatabaseHandler:
         required_cols_bank_acc = ['university', 'bank account']
 
         try:
-            # --- Read bank_acc_db.db ---
             if not os.path.exists(BANK_ACC_DB_PATH_FOR_VERIFICATION):
                 msg = f"Error: Database '{BANK_ACC_DB_PATH_FOR_VERIFICATION}' not found at expected path."
                 self._set_status(msg)
@@ -149,7 +145,6 @@ class DatabaseHandler:
                                    df_bank_acc['bank account'].astype(str)))
             self._set_status(f"Loaded {len(bank_acc_set)} unique university/bank account pairs from {os.path.basename(BANK_ACC_DB_PATH_FOR_VERIFICATION)}.")
 
-            # --- Read combined.db ---
             if not os.path.exists(COMBINED_DB_PATH_FOR_VERIFICATION):
                 msg = f"Error: Database '{COMBINED_DB_PATH_FOR_VERIFICATION}' not found at expected path."
                 self._set_status(msg)

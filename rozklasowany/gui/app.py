@@ -15,11 +15,9 @@ class ExcelProcessorApp(QMainWindow):
         self.setWindowTitle("Excel Processor Tool")
         self.setGeometry(100, 100, 800, 600)
 
-        # Create tab widget
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
 
-        # Create tabs
         self.outlook_tab = QWidget()
         self.case_list_tab = QWidget()
         self.scrape_tab = QWidget()
@@ -28,35 +26,28 @@ class ExcelProcessorApp(QMainWindow):
         self.tab_widget.addTab(self.case_list_tab, "Case List")
         self.tab_widget.addTab(self.scrape_tab, "Excel Scraper")
 
-        # Initialize components
         self.excel_scraper = ExcelDataScraper()
 
-        # Setup tabs
         self.setup_outlook_tab()
         self.setup_case_list_tab()
         self.setup_scrape_tab()
 
-        # Status bar
         self.status_bar = self.statusBar()
         self.status_bar.showMessage("Ready")
 
     def setup_outlook_tab(self):
         main_layout = QVBoxLayout()
 
-        # Form layout for inputs
         form_layout = QFormLayout()
 
-        # Email Category
         self.category_entry = QLineEdit()
         self.category_entry.setText("Approval")
         form_layout.addRow("Email Category:", self.category_entry)
 
-        # Target Senders
         self.senders_entry = QLineEdit()
         self.senders_entry.setText("Sender1,Sender2")
         form_layout.addRow("Target Senders (comma-separated):", self.senders_entry)
 
-        # Attachments Save Path
         self.attachment_path_entry = QLineEdit()
         self.attachment_path_entry.setText("C:/Attachments")
         self.attachment_path_button = QPushButton("Browse")
@@ -66,7 +57,6 @@ class ExcelProcessorApp(QMainWindow):
         attachment_path_layout.addWidget(self.attachment_path_button)
         form_layout.addRow("Attachments Save Path:", attachment_path_layout)
 
-        # Messages Save Path
         self.msg_path_entry = QLineEdit()
         self.msg_path_entry.setText("C:/Messages")
         self.msg_path_button = QPushButton("Browse")
@@ -76,7 +66,6 @@ class ExcelProcessorApp(QMainWindow):
         msg_path_layout.addWidget(self.msg_path_button)
         form_layout.addRow("Messages Save Path:", msg_path_layout)
 
-        # Checkboxes
         self.mark_as_read_check = QCheckBox("Mark emails as read")
         self.mark_as_read_check.setChecked(True)
         form_layout.addRow(self.mark_as_read_check)
@@ -87,7 +76,6 @@ class ExcelProcessorApp(QMainWindow):
 
         main_layout.addLayout(form_layout)
 
-        # Buttons
         buttons_layout = QHBoxLayout()
         self.check_unread_button = QPushButton("Check Unread Emails")
         self.check_unread_button.clicked.connect(self.check_unread_emails)
@@ -98,7 +86,6 @@ class ExcelProcessorApp(QMainWindow):
         buttons_layout.addWidget(self.process_emails_button)
         main_layout.addLayout(buttons_layout)
 
-        # Results display
         self.outlook_result_label = QLabel("Processing Results:")
         main_layout.addWidget(self.outlook_result_label)
         self.outlook_result_text = QTextEdit()
@@ -110,10 +97,8 @@ class ExcelProcessorApp(QMainWindow):
     def setup_case_list_tab(self):
         main_layout = QVBoxLayout()
 
-        # Form layout for inputs
         form_layout = QFormLayout()
 
-        # Excel Files Folder
         self.excel_folder_entry = QLineEdit()
         self.excel_folder_button = QPushButton("Browse")
         self.excel_folder_button.clicked.connect(lambda: self.browse_directory(self.excel_folder_entry))
@@ -122,7 +107,6 @@ class ExcelProcessorApp(QMainWindow):
         excel_folder_layout.addWidget(self.excel_folder_button)
         form_layout.addRow("Excel Files Folder:", excel_folder_layout)
 
-        # List Output Folder
         self.list_folder_entry = QLineEdit()
         self.list_folder_button = QPushButton("Browse")
         self.list_folder_button.clicked.connect(lambda: self.browse_directory(self.list_folder_entry))
@@ -133,12 +117,10 @@ class ExcelProcessorApp(QMainWindow):
 
         main_layout.addLayout(form_layout)
 
-        # Button
         self.process_case_list_button = QPushButton("Process Case List")
         self.process_case_list_button.clicked.connect(self.process_case_list)
         main_layout.addWidget(self.process_case_list_button)
 
-        # Results display
         self.case_list_result_label = QLabel("Processing Results:")
         main_layout.addWidget(self.case_list_result_label)
         self.case_list_result_text = QTextEdit()
@@ -150,7 +132,6 @@ class ExcelProcessorApp(QMainWindow):
     def setup_scrape_tab(self):
         main_layout = QVBoxLayout()
 
-        # Excel Files Directory
         self.scrape_dir_entry = QLineEdit()
         self.scrape_dir_button = QPushButton("Browse")
         self.scrape_dir_button.clicked.connect(lambda: self.browse_directory(self.scrape_dir_entry))
@@ -163,7 +144,6 @@ class ExcelProcessorApp(QMainWindow):
         main_layout.addWidget(QLabel("Excel Files Directory:"))
         main_layout.addLayout(scrape_dir_layout)
 
-        # Range selection
         range_layout = QHBoxLayout()
         range_layout.addWidget(QLabel("Cell Range:"))
         range_layout.addWidget(QLabel("From:"))
@@ -176,12 +156,10 @@ class ExcelProcessorApp(QMainWindow):
         range_layout.addWidget(self.range_end_entry)
         main_layout.addLayout(range_layout)
 
-        # Read headers checkbox
         self.read_headers_check = QCheckBox("Read headers from first row")
         self.read_headers_check.setChecked(True)
         main_layout.addWidget(self.read_headers_check)
 
-        # Buttons
         buttons_layout = QHBoxLayout()
         self.scrape_button = QPushButton("Scrape Excel Files")
         self.scrape_button.clicked.connect(self.scrape_excel_files)
@@ -194,7 +172,6 @@ class ExcelProcessorApp(QMainWindow):
         buttons_layout.addWidget(self.add_to_db_button)
         main_layout.addLayout(buttons_layout)
 
-        # Results display
         main_layout.addWidget(QLabel("Scraped Data:"))
         self.scrape_result_text = QTextEdit()
         self.scrape_result_text.setReadOnly(True)

@@ -1,1 +1,1 @@
-SHARED_MAILBOX_EMAIL = "" # Change to shared mailbox email address if needed, we're using the default mailbox
+SHARED_MAILBOX_EMAIL = ""

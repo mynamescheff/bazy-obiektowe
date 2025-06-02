@@ -6,58 +6,46 @@ class OutlookProcessor:
     @staticmethod
     def download_xlsx_from_unread_emails(download_folder="./rozklasowany/outlook", output_callback=None):
         try:
-            # Create output callback if not provided
             if output_callback is None:
                 output_callback = print
-            
-            # Create download folder if it doesn't exist
+
             if not os.path.exists(download_folder):
                 os.makedirs(download_folder)
                 output_callback(f"Created download folder: {download_folder}")
-            
-            # Connect to Outlook
+
             output_callback("Connecting to Outlook...")
             outlook = win32com.client.Dispatch("Outlook.Application")
             namespace = outlook.GetNamespace("MAPI")
-            
-            # Get the inbox folder
-            inbox = namespace.GetDefaultFolder(6)  # 6 = olFolderInbox
+
+            inbox = namespace.GetDefaultFolder(6)
             output_callback("Connected to Outlook inbox")
-            
-            # Get unread emails
+
             unread_emails = inbox.Items.Restrict("[Unread] = True")
             output_callback(f"Found {unread_emails.Count} unread emails")
             
             downloaded_count = 0
-            
-            # Process each unread email
+
             for email in unread_emails:
                 try:
                     output_callback(f"Processing email: {email.Subject}")
-                    
-                    # Check if email has attachments
+
                     if email.Attachments.Count > 0:
                         output_callback(f"  Found {email.Attachments.Count} attachments")
-                        
-                        # Process each attachment
+
                         for attachment in email.Attachments:
                             filename = attachment.FileName
-                            
-                            # Check if attachment is an Excel file
+
                             if filename.lower().endswith('.xlsx'):
-                                # Create unique filename with timestamp to avoid conflicts
                                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                                 sender_name = email.SenderName.replace(" ", "_").replace("<", "").replace(">", "")
                                 safe_filename = f"{timestamp}_{sender_name}_{filename}"
-                                
-                                # Remove any invalid characters for Windows filenames
+
                                 invalid_chars = '<>:"/\\|?*'
                                 for char in invalid_chars:
                                     safe_filename = safe_filename.replace(char, "_")
                                 
                                 filepath = os.path.join(download_folder, safe_filename)
-                                
-                                # Save the attachment
+
                                 attachment.SaveAsFile(filepath)
                                 downloaded_count += 1
                                 
@@ -88,7 +76,6 @@ class OutlookProcessor:
             return
             
         try:
-            # Create output callback if not provided
             if output_callback is None:
                 output_callback = print
                 
@@ -111,15 +98,13 @@ class OutlookProcessor:
     @staticmethod
     def check_unread_emails(output_callback=None):
         try:
-            # Create output callback if not provided
             if output_callback is None:
                 output_callback = print
                 
-            # Connect to Outlook
             output_callback("Connecting to Outlook to check unread emails...")
             outlook = win32com.client.Dispatch("Outlook.Application")
             namespace = outlook.GetNamespace("MAPI")
-            inbox = namespace.GetDefaultFolder(6)  # Inbox
+            inbox = namespace.GetDefaultFolder(6)
             unread_emails = inbox.Items.Restrict("[Unread] = True")
             
             excel_email_count = 0
@@ -130,7 +115,7 @@ class OutlookProcessor:
                         for attachment in email.Attachments:
                             if attachment.FileName.lower().endswith('.xlsx'):
                                 excel_email_count += 1
-                                break  # Count each email only once
+                                break
                 except Exception:
                     continue
                     
@@ -143,12 +128,10 @@ class OutlookProcessor:
     if __name__ == "__main__":
         print("Outlook Excel File Downloader")
         print("=" * 50)
-        
-        # Configuration
+
         DOWNLOAD_FOLDER = "downloaded_excel_files"
         MARK_AS_READ = False
-        
-        # Run the download process
+
         try:
             count = download_xlsx_from_unread_emails(DOWNLOAD_FOLDER)
             

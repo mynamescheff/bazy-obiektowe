@@ -2,7 +2,6 @@ import os
 import sqlite3
 import pandas as pd
 
-# --- Constant for the relational database ---
 PROJECT_DB_PATH = "project_data.db"
 CASE_LIST_DB_PATH = r".\\rozklasowany\\excelki\\cases\\case_list.db"
 
@@ -84,7 +83,6 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
 
     conn_combined = sqlite3.connect(combined_db_path)
     try:
-        # Check if 'data' table exists in combined.db
         cursor_combined_check = conn_combined.cursor()
         cursor_combined_check.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data';")
         if not cursor_combined_check.fetchone():
@@ -114,7 +112,6 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
     populated_count = 0
     for index, row in df_combined.iterrows():
         try:
-            # 1. University
             uni_name = str(row.get('university', 'Unknown University')).strip()
             cursor_project.execute("SELECT UniversityID FROM Universities WHERE Name = ?", (uni_name,))
             uni_result = cursor_project.fetchone()
@@ -124,9 +121,8 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
                 cursor_project.execute("INSERT INTO Universities (Name) VALUES (?)", (uni_name,))
                 university_id = cursor_project.lastrowid
 
-            # 2. User (simplified)
             first_name = str(row.get('name', 'N/A')).strip()
-            last_name = str(row.get('surname', '')).strip() # Surname might be empty
+            last_name = str(row.get('surname', '')).strip()
             user_email = f"{first_name.lower()}.{last_name.lower() if last_name else 'user'}@imported.example.com" if first_name != 'N/A' else "unknown.user@imported.example.com"
             
             cursor_project.execute("SELECT UserID FROM Users WHERE FirstName = ? AND LastName = ?", (first_name, last_name))
@@ -138,13 +134,11 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
                                        (first_name, last_name, user_email))
                 user_id = cursor_project.lastrowid
             
-            # 3. CaseNumbers
             case_num_str = str(row.get('case number', f"UNKNOWN_CASE_{index}")).strip()
             case_title = str(row.get('filename', 'Imported Case')).strip()
             case_amount = pd.to_numeric(row.get('amount'), errors='coerce')
             case_currency = str(row.get('currency', '')).strip()
             
-            # Use INSERT OR IGNORE for CaseNumbers assuming CaseNumber should be unique
             cursor_project.execute("""
                 INSERT OR IGNORE INTO CaseNumbers 
                 (CaseNumber, Title, Amount, Currency, UserID, UniversityID, Status, Description) 
@@ -152,17 +146,14 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
             """, (case_num_str, case_title, case_amount, case_currency, user_id, university_id, 
                   'Imported', f'Imported from {os.path.basename(combined_db_path)}'))
             
-            # Get CaseID (either newly inserted or existing if IGNORE happened)
             cursor_project.execute("SELECT CaseID FROM CaseNumbers WHERE CaseNumber = ?", (case_num_str,))
             case_id_result = cursor_project.fetchone()
             if not case_id_result:
-                # This should not happen if INSERT OR IGNORE worked and CaseNumber is unique
                 if text_widget_update: text_widget_update(f"Warning: Could not retrieve CaseID for {case_num_str}")
                 else: print(f"Warning: Could not retrieve CaseID for {case_num_str}")
                 continue 
             case_id = case_id_result[0]
 
-            # 4. Bank Account and Link (if bank account details are present)
             bank_acc_num = str(row.get('bank account', '')).strip()
             if bank_acc_num:
                 bank_acc_currency = case_currency
@@ -176,17 +167,16 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
                     cursor_project.execute("INSERT INTO BankAccounts (AccountNumber, Currency, UniversityID) VALUES (?, ?, ?)",
                                            (bank_acc_num, bank_acc_currency, university_id))
                     bank_account_id = cursor_project.lastrowid
-                
-                # Link Case to BankAccount
+
                 cursor_project.execute("INSERT OR IGNORE INTO CaseBankAccountsLink (CaseID, BankAccountID) VALUES (?, ?)",
                                        (case_id, bank_account_id))
             populated_count +=1
-        except sqlite3.IntegrityError as ie: # Handles cases like unique constraint violations if not covered by IGNORE
+        except sqlite3.IntegrityError as ie:
             msg = f"Skipping row {index+2} due to database integrity error (e.g. duplicate unique value): {ie}"
             if text_widget_update: text_widget_update(msg)
             else: print(msg)
         except Exception as e:
-            msg = f"Error processing row {index+2} from combined.db: {e}" # row index + 2 for 1-based and header
+            msg = f"Error processing row {index+2} from combined.db: {e}"
             if text_widget_update: text_widget_update(msg)
             else: print(msg)
             
@@ -207,16 +197,14 @@ def get_unique_universities_from_bank_acc_db(bank_acc_db_path: str, text_widget_
         return []
     try:
         conn = sqlite3.connect(bank_acc_db_path)
-        # Check if 'data' table and 'university' column exist
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data';")
         if not cursor.fetchone():
             raise sqlite3.OperationalError(f"Table 'data' not found in {bank_acc_db_path}")
-        
-        # Check for 'university' column (more robust check would be PRAGMA table_info(data))
+
         try:
             df = pd.read_sql_query("SELECT DISTINCT university FROM data WHERE university IS NOT NULL AND university != '' ORDER BY university", conn)
-        except pd.io.sql.DatabaseError as col_err: # Typically if column doesn't exist
+        except pd.io.sql.DatabaseError as col_err:
              raise sqlite3.OperationalError(f"Column 'university' likely missing or issue with table 'data' in {bank_acc_db_path}: {col_err}")
 
         conn.close()
@@ -239,7 +227,6 @@ def get_unique_case_numbers_from_case_list_db(case_list_db_path: str, text_widge
         return []
     try:
         conn = sqlite3.connect(case_list_db_path)
-        # Check if 'data' table and 'case_number' column exist
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data';")
         if not cursor.fetchone():
