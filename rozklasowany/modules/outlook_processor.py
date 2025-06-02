@@ -6,13 +6,6 @@ from datetime import datetime
 class OutlookProcessor:
     @staticmethod
     def download_xlsx_from_unread_emails(download_folder="./rozklasowany/outlook", output_callback=None):
-        """
-        Downloads .xlsx files from unread emails in Outlook
-        
-        Args:
-            download_folder (str): Folder where files will be saved
-            output_callback (function): Callback function to output messages
-        """
         try:
             # Create output callback if not provided
             if output_callback is None:
@@ -92,13 +85,6 @@ class OutlookProcessor:
 
     @staticmethod
     def mark_emails_as_read(mark_read=False, output_callback=None):
-        """
-        Optional: Mark processed emails as read
-        
-        Args:
-            mark_read (bool): Whether to mark emails as read after processing
-            output_callback (function): Callback function to output messages
-        """
         if not mark_read:
             return
             
@@ -125,7 +111,6 @@ class OutlookProcessor:
 
     @staticmethod
     def check_unread_emails(output_callback=None):
-        """Checks for unread emails with Excel attachments without downloading them"""
         try:
             # Create output callback if not provided
             if output_callback is None:

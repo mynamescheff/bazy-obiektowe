@@ -304,7 +304,6 @@ class ExcelProcessorApp(QMainWindow):
     ### Outlook Processor Methods ###
     
     def check_unread_emails(self):
-        """Only checks for unread emails with Excel attachments (no download)"""
         try:
             self.outlook_result_text.clear()
             
@@ -327,7 +326,6 @@ class ExcelProcessorApp(QMainWindow):
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
     
     def process_emails(self):
-        """Downloads attachments and marks as read (existing functionality)"""
         try:
             self.outlook_result_text.clear()
             attachment_path = self.attachment_path_entry.text()
@@ -396,7 +394,6 @@ class ExcelProcessorApp(QMainWindow):
             QTimer.singleShot(2000, lambda: self.status_bar.clearMessage())
 
     def get_case_list_content(self, list_folder):
-        """Read and return the content of case_list.txt"""
         list_file_path = os.path.join(list_folder, "case_list.txt")
         if os.path.exists(list_file_path):
             with open(list_file_path, "r", encoding="utf-8") as file:

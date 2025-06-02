@@ -3,11 +3,6 @@ import sqlite3
 import pandas as pd
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-# --- Constants for the verification function ---
-# User should ensure these files exist and are populated correctly.
-# Table name 'data' is assumed in both.
-# combined.db expected columns: 'university', 'bank account' (and others)
-# bank_acc_db.db expected columns: 'university', 'bank account'
 COMBINED_DB_PATH_FOR_VERIFICATION = r".\\rozklasowany\\excelki\\cases\\combined\\combined.db"
 BANK_ACC_DB_PATH_FOR_VERIFICATION = r".\\rozklasowany\\excelki\\bank_acc_db.db"
 
@@ -21,7 +16,6 @@ class DatabaseHandler:
         print(f"Status: {text}")
 
     def add_to_database(self):
-        # Replace Tkinter file dialogs with PyQt
         txt_file_path, _ = QFileDialog.getOpenFileName(
             None, "Select a .txt file to convert to database", "", "Text files (*.txt)"
         )
@@ -73,12 +67,6 @@ class DatabaseHandler:
             self._set_status("File to DB conversion process complete. Check messages for details.")
 
     def _convert_text_to_db(self, txt_path: str) -> str:
-        """
-        Read the text file, extract lines starting with 'case number: ',
-        pull out the case_number (first token) and filename (second token),
-        build a DataFrame with columns 'case_number' and 'filename', then
-        save to .db in the same directory. Table name is 'data'.
-        """
         self._set_status(f"Reading text file {os.path.basename(txt_path)}...")
         with open(txt_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -109,10 +97,6 @@ class DatabaseHandler:
         return db_path
 
     def _convert_excel_to_db(self, excel_path: str) -> str:
-        """
-        Read the first sheet of the selected Excel file into a DataFrame
-        and save to .db in the same directory. Table name is 'data'.
-        """
         self._set_status(f"Reading Excel file {os.path.basename(excel_path)}...")
         df = pd.read_excel(excel_path) 
         if df.empty:
@@ -125,16 +109,10 @@ class DatabaseHandler:
         return db_path
 
     def verify_bank_accounts_in_combined_db(self):
-        """
-        Verifies if 'bank account' values from 'combined.db' (table 'data')
-        exist in 'bank_acc_db.db' (table 'data'), considering the 'university'.
-        Paths to these databases are hardcoded constants at the top of this file.
-        Uses self._set_status and messagebox for feedback.
-        """
         self._set_status("Starting bank account verification...")
         
-        required_cols_combined = ['university', 'bank account'] # Note the space
-        required_cols_bank_acc = ['university', 'bank account'] # Note the space
+        required_cols_combined = ['university', 'bank account']
+        required_cols_bank_acc = ['university', 'bank account']
 
         try:
             # --- Read bank_acc_db.db ---
@@ -209,7 +187,7 @@ class DatabaseHandler:
 
             for index, row in df_combined.iterrows():
                 uni = str(row['university'])
-                acc = str(row['bank account']) # Note the space
+                acc = str(row['bank account'])
                 if (uni, acc) not in bank_acc_set:
                     record_info = f"Uni: {uni}, Acc: {acc}"
                     if 'filename' in df_combined.columns: record_info += f", File: {row.get('filename', 'N/A')}"

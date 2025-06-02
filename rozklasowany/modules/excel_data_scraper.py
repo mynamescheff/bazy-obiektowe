@@ -14,9 +14,6 @@ class ExcelDataScraper:
         self.directory = directory
         
     def scrape_excel_files(self, range_start="A2", range_end="G2", read_headers=True):
-        """
-        Scrape values from Excel files in the specified directory.
-        """
         if not self.directory or not os.path.isdir(self.directory):
             raise ValueError("Please set a valid directory first.")
             
@@ -85,7 +82,6 @@ class ExcelDataScraper:
         return self.results
     
     def save_results_to_csv(self, output_file):
-        """Save scraped results to a CSV file"""
         if not self.results:
             print("No results to save.")
             return False
@@ -115,7 +111,6 @@ class ExcelDataScraper:
             return False
         
     def save_results_to_excel(self, output_file):
-        """Save scraped results to an Excel file"""
         if not self.results:
             print("No results to save.")
             return False

@@ -4,7 +4,7 @@ import pandas as pd
 
 # --- Constant for the relational database ---
 PROJECT_DB_PATH = "project_data.db"
-CASE_LIST_DB_PATH = r".\\rozklasowany\\excelki\\cases\\case_list.db" # For fetching case numbers
+CASE_LIST_DB_PATH = r".\\rozklasowany\\excelki\\cases\\case_list.db"
 
 
 def _execute_query(db_path: str, query: str, params=None, text_widget_update=None):
@@ -32,10 +32,6 @@ def _execute_query(db_path: str, query: str, params=None, text_widget_update=Non
 
 
 def setup_project_schema(db_path: str):
-    """
-    Creates the tables for the project management database
-    (Users, Universities, CaseNumbers, BankAccounts, CaseBankAccountsLink).
-    """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     try:
@@ -71,7 +67,6 @@ def setup_project_schema(db_path: str):
     finally:
         conn.close()
 
-# --- NEW function to populate project_data.db from combined.db ---
 def populate_project_data_from_combined_db(project_db_path: str, combined_db_path: str, text_widget_update=None):
     """
     Populates the project_data.db with data from combined.db.
@@ -145,8 +140,8 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
             
             # 3. CaseNumbers
             case_num_str = str(row.get('case number', f"UNKNOWN_CASE_{index}")).strip()
-            case_title = str(row.get('filename', 'Imported Case')).strip() # Using filename as title
-            case_amount = pd.to_numeric(row.get('amount'), errors='coerce') # Ensure numeric
+            case_title = str(row.get('filename', 'Imported Case')).strip()
+            case_amount = pd.to_numeric(row.get('amount'), errors='coerce')
             case_currency = str(row.get('currency', '')).strip()
             
             # Use INSERT OR IGNORE for CaseNumbers assuming CaseNumber should be unique
@@ -168,9 +163,9 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
             case_id = case_id_result[0]
 
             # 4. Bank Account and Link (if bank account details are present)
-            bank_acc_num = str(row.get('bank account', '')).strip() # Note the space in 'bank account'
-            if bank_acc_num: # Only if a bank account number is provided
-                bank_acc_currency = case_currency # Use case's currency for the bank account for now
+            bank_acc_num = str(row.get('bank account', '')).strip()
+            if bank_acc_num:
+                bank_acc_currency = case_currency
                 
                 cursor_project.execute("SELECT BankAccountID FROM BankAccounts WHERE AccountNumber = ? AND UniversityID = ?", 
                                        (bank_acc_num, university_id))
@@ -203,8 +198,6 @@ def populate_project_data_from_combined_db(project_db_path: str, combined_db_pat
     else: print(final_msg)
     return populated_count
 
-
-# --- NEW functions to get unique lists for Comboboxes ---
 def get_unique_universities_from_bank_acc_db(bank_acc_db_path: str, text_widget_update=None) -> list:
     """Fetches unique university names from bank_acc_db.db (table 'data', column 'university')."""
     if not os.path.exists(bank_acc_db_path):
@@ -258,7 +251,6 @@ def get_unique_case_numbers_from_case_list_db(case_list_db_path: str, text_widge
              raise sqlite3.OperationalError(f"Column 'case_number' likely missing or issue with table 'data' in {case_list_db_path}: {col_err}")
 
         conn.close()
-        # Assuming column name is 'case_number'. Adjust if different.
         return sorted([str(cn) for cn in df['case_number'].tolist() if pd.notna(cn) and str(cn).strip()])
     except Exception as e:
         msg = f"Error fetching case numbers from '{case_list_db_path}': {e}"
