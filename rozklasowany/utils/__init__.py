@@ -1,4 +1,3 @@
-# Expose utility functions/constants
 from .constants import SHARED_MAILBOX_EMAIL
 from .helpers import (
     get_unique_filename,

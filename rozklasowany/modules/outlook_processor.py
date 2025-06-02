@@ -1,4 +1,3 @@
-# outlook_processor.py (modified)
 import os
 import win32com.client
 from datetime import datetime
