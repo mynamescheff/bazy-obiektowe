@@ -38,7 +38,7 @@ def init_database():
 class MainWindow(ExcelProcessorApp):
     def __init__(self, register_window, login_window):
         super().__init__()
-        self.setWindowTitle("Ekran Główny")
+        self.setWindowTitle("Main Window")
         self.setGeometry(100, 100, 800, 600)
         self.register_window = register_window
         self.login_window = login_window
@@ -74,17 +74,17 @@ class MainWindow(ExcelProcessorApp):
         self.login_window.show()
 
     def version(self):
-        QMessageBox.information(self, "Program", "Wersja 1.0.0")
+        QMessageBox.information(self, "Program", "Version 1.0.0")
 
     def back_or_quit(self):
         quit_box = QMessageBox(self)
         quit_box.setIcon(QMessageBox.Icon.Question)
-        quit_box.setWindowTitle("Zamknij aplikację")
-        quit_box.setText("Czy chcesz zamknąć aplikację?\nWrócić do okna logowania")
+        quit_box.setWindowTitle("Close applicantions")
+        quit_box.setText("Do you want to close the application?\nReturn to the login window")
 
-        close_button = quit_box.addButton("Zamknij aplikację", QMessageBox.ButtonRole.YesRole)
-        back_button = quit_box.addButton("Powrót do logowania", QMessageBox.ButtonRole.NoRole)
-        cancel_button = quit_box.addButton("Anuluj", QMessageBox.ButtonRole.RejectRole)
+        close_button = quit_box.addButton("Close applicantions", QMessageBox.ButtonRole.YesRole)
+        back_button = quit_box.addButton("Return to the login window", QMessageBox.ButtonRole.NoRole)
+        cancel_button = quit_box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
 
         quit_box.exec()
 
@@ -98,7 +98,7 @@ class MainWindow(ExcelProcessorApp):
 class LoginWindow(QWidget):
     def __init__(self, register_window, main_window, admin_window):
         super().__init__()
-        self.setWindowTitle("Ekran Logowania")
+        self.setWindowTitle("Login Window")
         self.setGeometry(100, 100, 800, 600)
         self.main_window = main_window
         self.register_window = register_window
@@ -151,7 +151,7 @@ class LoginWindow(QWidget):
         password = self.haslo_logowanie.text()
 
         if not login or not password:
-            QMessageBox.warning(self, "Błąd", "Musisz podać login i hasło!")
+            QMessageBox.warning(self, "Error", "You must enter your login and password!")
             return False
 
         try:
@@ -168,7 +168,7 @@ class LoginWindow(QWidget):
                         self.change_password_window = ChangePasswordWindow(login, employee_id, self)
                         self.change_password_window.show()
                     else:
-                        QMessageBox.information(self, "Sukces", "Zalogowano pomyślnie!")
+                        QMessageBox.information(self, "Success”, ”Logged in successfully!")
                         self.hide()
                         if role == "Admin":
                             self.admin_window.show()
@@ -176,13 +176,13 @@ class LoginWindow(QWidget):
                             self.main_window.show()
                         return True
                 else:
-                    QMessageBox.warning(self, "Błąd", "Nieprawidłowe hasło")
+                    QMessageBox.warning(self, "Error", "Incorrect password")
                     return False
             else:
-                QMessageBox.warning(self, "Błąd", "Nie znaleziono użytkownika")
+                QMessageBox.warning(self, "Error", "User not found")
                 return False
         except Exception as e:
-            QMessageBox.critical(self, "Błąd", f"Wystąpił błąd: {e}")
+            QMessageBox.critical(self, "Error", f"An error has occurred: {e}")
             return False
 
 class ChangePasswordWindow(QDialog):
@@ -190,7 +190,7 @@ class ChangePasswordWindow(QDialog):
         super().__init__(parent)
         self.login = login
         self.employee_id = employee_id
-        self.setWindowTitle("Zmiana hasła")
+        self.setWindowTitle("Change password")
         self.setGeometry(100, 100, 400, 300)
         self.setup_ui()
 
@@ -202,14 +202,14 @@ class ChangePasswordWindow(QDialog):
         self.confirm_password_input = QLineEdit()
         self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
 
-        layout.addRow("Nowe hasło:", self.new_password_input)
-        layout.addRow("Potwierdź hasło:", self.confirm_password_input)
+        layout.addRow("New password:", self.new_password_input)
+        layout.addRow("Confirm password:", self.confirm_password_input)
 
-        save_button = QPushButton("Zapisz")
+        save_button = QPushButton("Save")
         save_button.clicked.connect(self.save_new_password)
         layout.addWidget(save_button)
 
-        cancel_button = QPushButton("Anuluj")
+        cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.close)
         layout.addWidget(cancel_button)
 
@@ -225,15 +225,15 @@ class ChangePasswordWindow(QDialog):
         confirm_password = self.confirm_password_input.text().strip()
 
         if not new_password or not confirm_password:
-            QMessageBox.warning(self, "Błąd", "Musisz podać nowe hasło i potwierdzenie!")
+            QMessageBox.warning(self, "Error", "You must enter a new password and confirmation!")
             return
 
         if new_password != confirm_password:
-            QMessageBox.warning(self, "Błąd", "Hasła nie są zgodne!")
+            QMessageBox.warning(self, "Error", "The passwords do not match!")
             return
 
         if not self.is_valid_password(new_password):
-            QMessageBox.warning(self, "Błąd", "Hasło musi zawierać co najmniej 8 znaków, jedną dużą literę i jedną cyfrę!")
+            QMessageBox.warning(self, "Error", "The password must contain at least 8 characters, one capital letter, and one number!")
             return
 
         try:
@@ -246,7 +246,7 @@ class ChangePasswordWindow(QDialog):
             if result:
                 old_password_crypted = result[0]
                 if bcrypt.checkpw(new_password.encode('utf-8'), old_password_crypted.encode('utf-8')):
-                    QMessageBox.warning(self, "Błąd", "Nowe hasło musi różnić się od starego hasła!")
+                    QMessageBox.warning(self, "Error", "The new password must be different from the old password!")
                     conn.close()
                     return
 
@@ -255,16 +255,16 @@ class ChangePasswordWindow(QDialog):
                       (password_crypted, self.employee_id))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sukces", "Hasło zostało zmienione. Zaloguj się ponownie.")
+            QMessageBox.information(self, "Success", "Your password has been changed. Please log in again.")
             self.close()
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Błąd", f"Nie udało się zmienić hasła: {e}")
+            QMessageBox.critical(self, "Error", f"Unable to change password: {e}")
             conn.close()
 
 class RegisterWindow(QWidget):
     def __init__(self, login_window):
         super().__init__()
-        self.setWindowTitle("Ekran Rejestracji")
+        self.setWindowTitle("Registration Screen")
         self.setGeometry(100, 100, 800, 700)
         self.login_window = login_window
         self.RegisterUI()
@@ -360,20 +360,20 @@ class RegisterWindow(QWidget):
         confirm_password = self.confirm_password_input.text().strip()
 
         if not name or not second_name or not email or not login or not password or not confirm_password:
-            QMessageBox.warning(self, "Błąd", "Nie podano wszystkich danych potrzebnych do logowania")
+            QMessageBox.warning(self, "Error", "Not all the data required for login has been provided")
             return False
 
         if password != confirm_password:
-            QMessageBox.warning(self, "Błąd", "Hasła nie są zgodne")
+            QMessageBox.warning(self, "Error", "Passwords do not match")
             return False
 
         if not self.is_valid_email(email):
-            QMessageBox.warning(self, "Błąd", "Podano niepoprawny adres email")
+            QMessageBox.warning(self, "Error", "Invalid email address provided")
             return False
 
         if not self.is_valid_password(password):
-            QMessageBox.warning(self, "Błąd",
-                                "Hasło musi zawierać co najmniej 8 znaków, jedną dużą literę i jedną cyfrę")
+            QMessageBox.warning(self, "Error",
+                                "The password must contain at least 8 characters, one capital letter, and one number")
             return False
 
         password_crypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -385,13 +385,13 @@ class RegisterWindow(QWidget):
 
             c.execute("SELECT 1 FROM Users WHERE login = ?", (login,))
             if c.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim loginie już istnieje")
+                QMessageBox.warning(self, "Error", "A user with this login already exists")
                 conn.close()
                 return False
 
             c.execute("SELECT 1 FROM Employees WHERE email = ?", (email,))
             if c.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim adresie email już istnieje")
+                QMessageBox.warning(self, "Error", "A user with this email address already exists")
                 conn.close()
                 return False
 
@@ -401,18 +401,18 @@ class RegisterWindow(QWidget):
             c.execute("INSERT INTO Users (login, password, employee_id) VALUES (?, ?, ?)", (login, password_crypted, employee_id))
             conn.commit()
             conn.close()
-            QMessageBox.information(self, "Sukces", "Konto zostało założone!")
+            QMessageBox.information(self, "Success", "Your account has been created!")
             return True
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed: Users.login" in str(e):
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim loginie już istnieje")
+                QMessageBox.warning(self, "Error", "A user with this login already exists")
             elif "UNIQUE constraint failed: Employees.email" in str(e):
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim adresie email już istnieje")
+                QMessageBox.warning(self, "Error", "A user with this email address already exists")
             else:
-                QMessageBox.warning(self, "Błąd", f"Wystąpił błąd integracji: {e}")
+                QMessageBox.warning(self, "Error", f"An integration error has occurred: {e}")
             return False
         except sqlite3.Error as e:
-            QMessageBox.warning(self, "Błąd", f"Wystąpił błąd bazy danych: {e}")
+            QMessageBox.warning(self, "Error", f"A database error has occurred: {e}")
             return False
 
     def register_success(self):
@@ -427,7 +427,7 @@ class RegisterWindow(QWidget):
 class AdminWindow(MainWindow):
     def __init__(self, register_window, login_window):
         super().__init__(register_window, login_window)
-        self.setWindowTitle("Ekran Administratora")
+        self.setWindowTitle("Administrator Window")
         self.setGeometry(100, 100, 800, 600)
         self.register_window = register_window
         self.login_window = login_window
@@ -454,13 +454,13 @@ class AdminWindow(MainWindow):
         db = QSqlDatabase.addDatabase("QSQLITE", f"admin_db_{id(self)}")
         db.setDatabaseName("project_2.db")
         if not db.open():
-            QMessageBox.warning(self, "Błąd", "Nie udało się połączyć z bazą danych")
+            QMessageBox.warning(self, "Error", "Unable to connect to the database")
             return
 
         query = QSqlQuery(db)
         query.exec("PRAGMA foreign_keys = ON")
         if query.lastError().isValid():
-            QMessageBox.warning(self, "Błąd", f"Nie udało się włączyć kluczy obcych: {query.lastError().text()}")
+            QMessageBox.warning(self, "Error", f"Unable to activate foreign keys: {query.lastError().text()}")
             db.close()
             return
 
@@ -468,7 +468,7 @@ class AdminWindow(MainWindow):
         self.model.setTable("Employees")
         self.model.setEditStrategy(QSqlTableModel.EditStrategy.OnManualSubmit)
         if not self.model.select():
-            QMessageBox.warning(self, "Błąd", f"Nie udało się załadować danych: {self.model.lastError().text()}")
+            QMessageBox.warning(self, "Error", f"Failed to load data: {self.model.lastError().text()}")
             db.close()
             return
 
@@ -505,19 +505,19 @@ class AdminWindow(MainWindow):
             self.table_view.setIndexWidget(self.model.index(row, modify_column), modify_button)
 
     def delete_record(self, row):
-        confirm = QMessageBox.question(self, "Potwierdzenie", "Czy na pewno chcesz usunąć tego użytkownika?",
+        confirm = QMessageBox.question(self, "Confirmation", "Are you sure you want to delete this user?",
                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if confirm == QMessageBox.StandardButton.Yes:
             employee_id = self.model.record(row).value("id")
             if self.model.removeRow(row):
                 if self.model.submitAll():
-                    QMessageBox.information(self, "Sukces", "Użytkownik usunięty pomyślnie.")
+                    QMessageBox.information(self, "Success", "User successfully deleted.")
                     self.register_data()
                 else:
                     error = self.model.lastError().text()
-                    QMessageBox.critical(self, "Błąd", f"Nie udało się usunąć użytkownika: {error}")
+                    QMessageBox.critical(self, "Error", f"Unable to delete user: {error}")
             else:
-                QMessageBox.critical(self, "Błąd", "Nie udało się usunąć wiersza.")
+                QMessageBox.critical(self, "Error", "The row could not be deleted.")
 
     def edit_employee(self, row):
         record = self.model.record(row)
@@ -541,7 +541,7 @@ class EditEmployeeWindow(QDialog):
         self.employee_data = employee_data
         self.model = model
         self.row = row
-        self.setWindowTitle("Edytuj pracownika")
+        self.setWindowTitle("Edit employee")
         self.setGeometry(100, 100, 400, 300)
         self.setup_ui()
 
@@ -555,16 +555,16 @@ class EditEmployeeWindow(QDialog):
         self.role_combo.addItems(["Employee", "Admin"])
         self.role_combo.setCurrentText(self.employee_data['role'])
 
-        layout.addRow("Imię:", self.name_input)
-        layout.addRow("Nazwisko:", self.second_name_input)
+        layout.addRow("Name:", self.name_input)
+        layout.addRow("Second name:", self.second_name_input)
         layout.addRow("Email:", self.email_input)
-        layout.addRow("Rola:", self.role_combo)
+        layout.addRow("Role:", self.role_combo)
 
-        save_button = QPushButton("Zapisz zmiany")
+        save_button = QPushButton("Save changes")
         save_button.clicked.connect(self.save_changes)
         layout.addWidget(save_button)
 
-        cancel_button = QPushButton("Anuluj")
+        cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.close)
         layout.addWidget(cancel_button)
 
@@ -572,11 +572,11 @@ class EditEmployeeWindow(QDialog):
 
     def save_changes(self):
         if not self.name_input.text().strip() or not self.second_name_input.text().strip() or not self.email_input.text().strip():
-            QMessageBox.warning(self, "Błąd", "Wszystkie pola muszą być wypełnione!")
+            QMessageBox.warning(self, "Error", "All fields must be filled in!")
             return
 
         if not self.is_valid_email(self.email_input.text()):
-            QMessageBox.warning(self, "Błąd", "Nieprawidłowy adres email!")
+            QMessageBox.warning(self, "Error", "Invalid email address!")
             return
 
         self.model.setData(self.model.index(self.row, 1), self.name_input.text())
@@ -584,11 +584,11 @@ class EditEmployeeWindow(QDialog):
         self.model.setData(self.model.index(self.row, 3), self.email_input.text())
         self.model.setData(self.model.index(self.row, 4), self.role_combo.currentText())
         if self.model.submitAll():
-            QMessageBox.information(self, "Sukces", "Dane pracownika zaktualizowane.")
+            QMessageBox.information(self, "Success", "Employee data updated.")
             self.close()
         else:
             error = self.model.lastError().text()
-            QMessageBox.critical(self, "Błąd", f"Nie udało się zaktualizować danych pracownika: {error}")
+            QMessageBox.critical(self, "Error", f"Failed to update employee data: {error}")
 
     def is_valid_email(self, email):
         pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
@@ -598,7 +598,7 @@ class AddNewUserWindow(QDialog):
     def __init__(self, model, parent=None):
         super().__init__(parent)
         self.model = model
-        self.setWindowTitle("Dodaj nowego użytkownika")
+        self.setWindowTitle("Add new user")
         self.setGeometry(100, 100, 400, 400)
         self.setup_ui()
 
@@ -616,19 +616,19 @@ class AddNewUserWindow(QDialog):
         self.role_combo = QComboBox()
         self.role_combo.addItems(["Employee", "Admin"])
 
-        layout.addRow("Imię:", self.name_input)
-        layout.addRow("Nazwisko:", self.second_name_input)
+        layout.addRow("Name:", self.name_input)
+        layout.addRow("Second name:", self.second_name_input)
         layout.addRow("Email:", self.email_input)
         layout.addRow("Login:", self.login_input)
-        layout.addRow("Hasło:", self.password_input)
-        layout.addRow("Potwierdź hasło:", self.confirm_password_input)
-        layout.addRow("Rola:", self.role_combo)
+        layout.addRow("Password:", self.password_input)
+        layout.addRow("Confirm password:", self.confirm_password_input)
+        layout.addRow("Role:", self.role_combo)
 
-        save_button = QPushButton("Dodaj użytkownika")
+        save_button = QPushButton("Add user")
         save_button.clicked.connect(self.save_new_user)
         layout.addWidget(save_button)
 
-        cancel_button = QPushButton("Anuluj")
+        cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.close)
         layout.addWidget(cancel_button)
 
@@ -653,19 +653,19 @@ class AddNewUserWindow(QDialog):
         role = self.role_combo.currentText()
 
         if not all([name, second_name, email, login, password, confirm_password]):
-            QMessageBox.warning(self, "Błąd", "Wszystkie pola muszą być wypełnione!")
+            QMessageBox.warning(self, "Error", "All fields must be filled in!")
             return
 
         if not self.is_valid_email(email):
-            QMessageBox.warning(self, "Błąd", "Nieprawidłowy adres email!")
+            QMessageBox.warning(self, "Error", "Invalid email address!")
             return
 
         if password != confirm_password:
-            QMessageBox.warning(self, "Błąd", "Hasła nie są zgodne!")
+            QMessageBox.warning(self, "Error", "The passwords do not match!")
             return
 
         if not self.is_valid_password(password):
-            QMessageBox.warning(self, "Błąd", "Hasło musi zawierać co najmniej 8 znaków, jedną dużą literę i jedną cyfrę!")
+            QMessageBox.warning(self, "Error", "The password must contain at least 8 characters, one capital letter, and one number!")
             return
 
         try:
@@ -675,13 +675,13 @@ class AddNewUserWindow(QDialog):
 
             c.execute("SELECT 1 FROM Users WHERE login = ?", (login,))
             if c.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim loginie już istnieje!")
+                QMessageBox.warning(self, "Error", "A user with this login already exists!")
                 conn.close()
                 return
 
             c.execute("SELECT 1 FROM Employees WHERE email = ?", (email,))
             if c.fetchone():
-                QMessageBox.warning(self, "Błąd", "Użytkownik o takim adresie email już istnieje!")
+                QMessageBox.warning(self, "Error", "A user with this email address already exists!")
                 conn.close()
                 return
 
@@ -696,13 +696,13 @@ class AddNewUserWindow(QDialog):
             conn.close()
 
             self.model.select()
-            QMessageBox.information(self, "Sukces", "Użytkownik został dodany pomyślnie!")
+            QMessageBox.information(self, "Success", "User added successfully!")
             self.close()
 
         except sqlite3.IntegrityError as e:
-            QMessageBox.critical(self, "Błąd", f"Błąd integralności danych: {e}")
+            QMessageBox.critical(self, "Error", f"Data integrity error: {e}")
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Błąd", f"Wystąpił błąd bazy danych: {e}")
+            QMessageBox.critical(self, "Error", f"A database error has occurred: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
