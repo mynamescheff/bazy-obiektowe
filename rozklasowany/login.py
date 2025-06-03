@@ -168,7 +168,7 @@ class LoginWindow(QWidget):
                         self.change_password_window = ChangePasswordWindow(login, employee_id, self)
                         self.change_password_window.show()
                     else:
-                        QMessageBox.information(self, "Success”, ”Logged in successfully!")
+                        QMessageBox.information(self, "Success", "Logged in successfully!")
                         self.hide()
                         if role == "Admin":
                             self.admin_window.show()
@@ -264,7 +264,7 @@ class ChangePasswordWindow(QDialog):
 class RegisterWindow(QWidget):
     def __init__(self, login_window):
         super().__init__()
-        self.setWindowTitle("Registration Screen")
+        self.setWindowTitle("Registration Window")
         self.setGeometry(100, 100, 800, 700)
         self.login_window = login_window
         self.RegisterUI()
@@ -448,6 +448,7 @@ class AdminWindow(MainWindow):
         self.register_data()
 
     def register_data(self):
+
         layout = QVBoxLayout(self.admin_tab)
         print("Test")
 
